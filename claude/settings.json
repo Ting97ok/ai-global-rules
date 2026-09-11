@@ -1,0 +1,132 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git rebase*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push*--force*)",
+      "Bash(git reset*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore*)",
+      "Bash(git clean*)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git branch -D*)",
+      "Bash(rm -r*)",
+      "Bash(rm -fr*)",
+      "Bash(rm -rf*)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git push*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/commit-checkpoint.py",
+            "timeout": 15,
+            "statusMessage": "커밋 체크포인트 확인"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/prose-check.py",
+            "timeout": 15,
+            "statusMessage": "문서 산문 검사"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/memory-note.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/git-guard.py",
+            "timeout": 20,
+            "statusMessage": "git·gh 규칙 확인"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/agent-guard.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME\"/.claude/hooks/stop-check.py",
+            "timeout": 15,
+            "statusMessage": "답변의 명령 블록 검사"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "figma@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "harness@harness-marketplace": true,
+    "humanize-korean@im-not-ai": true,
+    "ponytail@ponytail": true,
+    "claude-mem-cowork@thedotmack": true,
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "harness-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "revfactory/harness"
+      }
+    },
+    "im-not-ai": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/epoko77-ai/im-not-ai.git"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "thedotmack": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
+    },
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
+  }
+}
