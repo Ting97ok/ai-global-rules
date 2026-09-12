@@ -44,6 +44,16 @@ class CommitCheckpoint(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("체크포인트", result.stdout)
 
+    def test_테스트가_실패하면_체크포인트를_내지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            result = run(
+                "python3 ~/.claude/hooks/tests/test_stop_check.py",
+                "FAIL: test_x\nRan 1 test in 0.03s\n\nFAILED (failures=1)\n",
+                folder,
+            )
+            self.assertEqual("", result.stdout.strip(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
