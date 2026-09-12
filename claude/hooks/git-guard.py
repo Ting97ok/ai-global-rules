@@ -9,6 +9,7 @@
   5. gh pr merge --merge / --rebase      스쿼시만 쓴다
   6. 드래프트가 아닌 gh pr create, gh pr ready, gh pr merge 에 PR 본문 3항목이 없음
   7. PR 본문의 전각 대시 문장 잇기 (PR 본문도 문서 작성 규칙을 따른다)
+  8. 브랜치의 두 번째 커밋인데 열린 PR 이 없음   드래프트 PR 을 먼저 연다
 
 종료 코드 2 + stderr 가 차단이다. 판단이 필요한 것은 여기 두지 않는다.
 """
@@ -66,6 +67,40 @@ def current_branch(cwd):
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
+def commits_ahead(cwd):
+    """기본 브랜치 이후 이 브랜치에 쌓인 커밋 수. 셀 수 없으면 -1."""
+    for base in ("main", "master"):
+        r = subprocess.run(["git", "rev-list", "--count", base + "..HEAD"],
+                           cwd=cwd or None, capture_output=True, text=True, timeout=10)
+        if r.returncode == 0 and r.stdout.strip().isdigit():
+            return int(r.stdout.strip())
+    return -1
+
+
+def pr_state(cwd):
+    """이 브랜치에 열린 PR 이 있으면 True, 없으면 False, 확인할 수 없으면 None."""
+    try:
+        r = subprocess.run(["gh", "pr", "view", "--json", "number"],
+                           cwd=cwd or None, capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode == 0:
+        return True
+    return False if "no pull requests found" in r.stderr.lower() else None
+
+
+def needs_pr(branch, ahead, pr):
+    """브랜치에 커밋이 하나 쌓였는데 열린 PR 이 없으면 True.
+
+    첫 커밋 전에는 PR 을 열 수 없어서(빈 브랜치는 GitHub 가 거절한다) 두 번째 커밋에서 한 번만 본다.
+    """
+    if branch in ("", "main", "master", "HEAD"):
+        return False
+    if pr is not False:
+        return False
+    return ahead == 1
+
+
 def option_values(toks, names):
     """--body X / --body=X / -b X 꼴의 값을 전부 모은다."""
     vals = []
@@ -114,6 +149,10 @@ def check_git(toks, cwd):
             for m in msgs:
                 if SIGNATURE.search(m):
                     fail("커밋 메시지에 도구 서명(Co-Authored-By: Claude / Generated with Claude Code)을 넣지 않는다")
+        branch = current_branch(cwd)
+        ahead = commits_ahead(cwd) if branch not in ("", "main", "master", "HEAD") else 0
+        if ahead == 1 and needs_pr(branch, ahead, pr_state(cwd)):
+            fail("브랜치 작업은 드래프트 PR 을 먼저 연다. gh pr create --draft 로 열고 이어서 커밋한다")
     elif sub == "push":
         for t in toks[2:]:
             if t.startswith("+") and not t.startswith("+="):
