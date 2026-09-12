@@ -12,6 +12,7 @@ SRC="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CODEX="${CODEX_HOME:-$HOME/.codex}"
 SKILLS="${AGENTS_SKILLS:-$HOME/.agents/skills}"
 STATE="$CODEX/claude-sync.sha256"
+RULES="$(dirname "$0")/codex/claude-deny.rules"   # 이 저장소가 원본이다
 FORCE=0
 [ "${1:-}" = "-f" ] && FORCE=1
 
@@ -28,7 +29,7 @@ DROP='- **교차 검증**:
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 STAGE="$T/stage"
-mkdir -p "$STAGE/codex/hooks" "$STAGE/skills"
+mkdir -p "$STAGE/codex/hooks" "$STAGE/codex/rules" "$STAGE/skills"
 
 # 1. 전역 규칙
 DROP="$DROP" awk '
@@ -58,6 +59,9 @@ done
 #    이벤트 순서와 명령 꼴을 지금 hooks.json 과 같게 둔다. 훅 신뢰 승인이 그대로 유지된다.
 rsync -a --exclude __pycache__ --exclude tests "$SRC/hooks/" "$STAGE/codex/hooks/"
 for h in $NOT_HOOKS; do rm -f "$STAGE/codex/hooks/$h"; done
+# 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
+[ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
+
 jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
@@ -78,7 +82,8 @@ sums() {  # sums <codex 뿌리> <스킬 뿌리> <스킬 이름…>
   c=$1
   k=$2
   shift 2
-  for f in AGENTS.md hooks.json hooks; do
+  # rules 는 폴더가 아니라 우리가 옮기는 파일 하나만 본다. 손으로 넣은 규칙까지 감시하면 매번 걸린다
+  for f in AGENTS.md hooks.json hooks rules/claude-deny.rules; do
     [ -e "$c/$f" ] || continue
     (cd "$c" && find "$f" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
       sed 's|  |  codex/|'
@@ -122,7 +127,7 @@ fi
 # 5. 백업하고 옮긴다. 해시 기록은 모두 끝난 뒤에 쓴다
 B="$CODEX/claude-sync-backup/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$B/codex" "$B/skills"
-for f in AGENTS.md hooks.json hooks; do
+for f in AGENTS.md hooks.json hooks rules; do
   [ -e "$CODEX/$f" ] && cp -R "$CODEX/$f" "$B/codex/" || true
 done
 for s in $NEW_NAMES $GONE; do
@@ -132,6 +137,8 @@ done
 mkdir -p "$CODEX/hooks" "$SKILLS"
 cp "$STAGE/codex/AGENTS.md" "$STAGE/codex/hooks.json" "$CODEX/"
 rsync -a --delete --exclude __pycache__ "$STAGE/codex/hooks/" "$CODEX/hooks/"
+mkdir -p "$CODEX/rules"
+rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
 for s in $NEW_NAMES; do
   rsync -a --delete --exclude __pycache__ "$STAGE/skills/$s/" "$SKILLS/$s/"
 done
