@@ -7,6 +7,7 @@
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 주면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 돌리지 않은 것.
   3. 이번 턴의 마지막 테스트 실행이 실패했는데 커밋 명령을 주는 것. 한 사이클은 GREEN 까지 간다(「TDD」).
+     내용이 없는 빈 커밋(--allow-empty)은 뺀다. 브랜치를 열어 드래프트 PR 을 만드는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 도는 것이 정상이라 마지막 실행만 본다.
 이미 이 훅으로 되돌아온 턴(stop_hook_active)은 다시 막지 않는다. 무한 루프 방지.
 """
@@ -19,6 +20,7 @@ from testrun import FAILURE, as_text, is_test_run
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
 STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
 
 
 def load_transcript(path):
@@ -111,7 +113,7 @@ def main():
         if not any(STATE_CHECK.search(c) for c in ran_commands):
             problems.append("커밋·푸시·PR 명령을 주기 전에 이번 턴에서 상태를 확인한다 (git status / git log / gh pr view). "
                             "확인을 실제로 돌리고, 그 결과에 맞춰 명령을 다시 낸다")
-        if last_test_failed:
+        if last_test_failed and any(GIT_ACTION.search(b) and not EMPTY_COMMIT.search(b) for b in blocks):
             problems.append("이번 턴의 마지막 테스트 실행이 실패했다. 한 사이클은 GREEN 까지 진행하고 커밋 명령은 그때 낸다. "
                             "고치지 못했으면 커밋 명령 없이 무엇이 막혔는지 보고한다")
     if problems:
