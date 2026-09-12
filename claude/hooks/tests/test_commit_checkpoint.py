@@ -103,6 +103,15 @@ class CommitCheckpoint(unittest.TestCase):
                 result = run("python3 tests/test_x.py", output, folder)
                 self.assertEqual("", result.stdout.strip(), output)
 
+    def test_Codex_출력의_종료_코드로_실패를_읽는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            chunks = [{"type": "input_text", "text": "Script completed\nOutput:\n"},
+                      {"type": "input_text",
+                       "text": '{"chunk_id":"8f72","exit_code":1,"output":"F\\n----\\nAssertionError\\n"}'}]
+            result = run("python3 tests/test_x.py", chunks, folder)
+            self.assertEqual("", result.stdout.strip(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
