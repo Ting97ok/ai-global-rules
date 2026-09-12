@@ -57,6 +57,6 @@ prefix_rule(
     justification = "폴더를 통째로 지운다",
 )
 
-# 옮기지 못한 것
-# - `git push origin --force` 처럼 깃발이 뒤에 오는 꼴. prefix_rule 은 앞에서부터만 맞춘다.
-# - `rm -r -f` 처럼 깃발을 나눠 쓴 꼴.
+# 옮기지 못한 것. prefix_rule 은 인자를 앞에서부터 맞춘다
+# - `git push origin --force` 처럼 깃발이 원격 이름 뒤에 오는 꼴.
+# - `rm -f -r` 처럼 `-r` 이 첫 깃발이 아닌 꼴. `rm -r -f` 는 두 번째 인자가 `-r` 이라 막힌다.
