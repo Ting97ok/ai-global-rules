@@ -62,7 +62,7 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 | `stop-check.py` | 동작한다 |
 | `prose-check.py` | 동작한다 |
 | `memory-note.py` | 동작한다 |
-| `commit-checkpoint.py` | 확인하지 않았다 |
+| `commit-checkpoint.py` | 동작한다 |
 | `agent-guard.py` | Claude 의 `Agent` 도구를 검사하는 훅이다 |
 | `doc-skill-guard.py` | 등록하지 않는다.<br>Claude 의 스킬 호출 기록에 기대는 훅이다 |
 
@@ -70,7 +70,7 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 부르라고 지시한다. 누락을 자동으로 막지는 않는다.
 
-되돌리기 어려운 명령은 훅이 아니라 권한 규칙으로 막는다. [codex/claude-deny.rules](codex/claude-deny.rules) 가 `~/.codex/rules/` 로 들어가 `git reset`·`git clean`·`rm -rf` 등 아홉 가지를 거절하고, 거절할 때 규칙에 적은 이유를 그대로 보여 준다. 인자를 앞에서부터 맞추는 방식이라 `git push origin --force` 나 `rm -f -r` 처럼 깃발 순서가 다른 명령은 못 막는다. 못 막는 것은 규칙 파일 끝에 적었다.
+되돌리기 어려운 명령은 훅이 아니라 권한 규칙으로 막는다. [codex/claude-deny.rules](codex/claude-deny.rules) 가 `~/.codex/rules/` 로 들어가 `git reset`·`git clean`·`rm -rf` 등 열한 가지를 거절하고, 거절할 때 규칙에 적은 이유를 그대로 보여 준다. 인자를 앞에서부터 맞추는 방식이라 깃발이 올 수 있는 자리를 하나씩 적어야 한다. `git push mirror --force` 처럼 원격 이름이 다른 것은 여전히 못 막는다. 못 막는 것은 규칙 파일 끝에 적었다.
 
 저장소마다 정한 규칙은 사본을 만들지 않는다. `config.toml` 에 `project_doc_fallback_filenames = ["CLAUDE.md"]` 를 두면 Codex 가 그 저장소의 `CLAUDE.md` 를 직접 읽는다. 사본을 두면 원본을 고쳐도 사본은 그대로 남는다. 설정이 빠졌는지는 `codex-sync.sh` 가 확인한다.
 
