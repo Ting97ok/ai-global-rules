@@ -15,7 +15,7 @@ import json
 import re
 import sys
 
-from testrun import FAILURE, as_text, is_test_run
+from testrun import FAILURE, as_text, is_test_run, shell_command
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -48,7 +48,16 @@ def content_blocks(row):
     return c if isinstance(c, list) else []
 
 
+def codex_payload(row):
+    """Codex 기록의 payload. Claude 기록이면 None."""
+    p = row.get("payload")
+    return p if isinstance(p, dict) else None
+
+
 def is_human_turn(row):
+    p = codex_payload(row)
+    if p is not None:
+        return p.get("type") == "message" and p.get("role") == "user"
     if row.get("type") != "user":
         return False
     blocks = content_blocks(row)
@@ -77,6 +86,19 @@ def main():
     ran_commands, last_text = [], ""
     commands, last_test_failed = {}, False
     for r in turn:
+        p = codex_payload(r)
+        if p is not None:
+            t = p.get("type")
+            if t == "custom_tool_call":
+                command = shell_command(p.get("input"))
+                ran_commands.append(command)
+                commands[p.get("call_id")] = command
+            elif t == "custom_tool_call_output":
+                if is_test_run(commands.get(p.get("call_id"), "")):
+                    last_test_failed = bool(FAILURE.search(as_text(p.get("output"))))
+            elif t == "message" and p.get("role") == "assistant":
+                last_text = as_text(p.get("content"))
+            continue
         kind = r.get("type")
         if kind == "assistant":
             texts = []

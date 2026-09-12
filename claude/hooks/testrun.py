@@ -66,3 +66,18 @@ def edited_paths(payload):
     cwd = payload.get("cwd") or ""
     return [os.path.join(cwd, p.strip()) if cwd else p.strip()
             for p in PATCH_FILE.findall(tool_input.get("command") or "")]
+
+
+CODEX_CMD = re.compile(r'cmd\s*:\s*"((?:[^"\\\\]|\\\\.)*)"')
+
+
+def shell_command(raw):
+    """셸 호출 기록에서 실제 명령을 꺼낸다.
+
+    Claude 는 명령 문자열을 그대로 준다. Codex 는 `tools.exec_command({cmd:"…"})` 로 감싸서
+    명령이 따옴표 안에 들어간다. 감싼 채로 두면 인용 구간을 지우는 판정이 명령까지 지운다.
+    """
+    m = CODEX_CMD.search(raw or "")
+    if not m:
+        return raw or ""
+    return m.group(1).replace('\\"', '"').replace("\\\\", "\\")
