@@ -54,6 +54,16 @@ class CommitCheckpoint(unittest.TestCase):
             )
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+    def test_따옴표_안의_테스트_명령은_실행으로_보지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            result = run(
+                'claude -p "python3 tests/test_x.py 를 돌려줘" --output-format json',
+                "세션이 끝났다",
+                folder,
+            )
+            self.assertEqual("", result.stdout.strip(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

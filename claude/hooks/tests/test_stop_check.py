@@ -80,6 +80,19 @@ class StopCheck(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("GREEN", result.stdout)
 
+    def test_빈_커밋_명령은_빨간_상태에서도_막지_않는다(self):
+        rows = [
+            human("브랜치를 시작해"),
+            bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+            bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)"),
+            bash_call("t2", "cd /repo && git status --short"),
+            bash_result("t2", " M claude/hooks/git-guard.py"),
+            answer('브랜치를 엽니다.\n\n```bash\ncd /repo && git commit --allow-empty -m "[Docs] 브랜치 시작"\n```\n'),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertEqual("", result.stdout.strip(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
