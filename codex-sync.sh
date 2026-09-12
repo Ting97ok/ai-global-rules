@@ -26,30 +26,15 @@ NOT_SKILLS="codex-cross-check"
 # Codex 에 붙이지 않는 훅. Claude 의 Skill 도구 호출을 찾는 훅이라
 # Codex 에서는 하는 일 없이 신뢰 승인만 요구한다
 NOT_HOOKS="doc-skill-guard.py"
-# Claude 에만 맞는 줄의 첫머리. 원본에서 한 번씩만 걸려야 한다.
-# 규칙 문장이 바뀌면 여기서 멈춘다. 조용히 새는 것보다 낫다.
-DROP='- **교차 검증**:
-문서 파일을 쓰기 전에 스킬을 불렀는지는 훅(`doc-skill-guard.py`)이 확인한다.'
-
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 STAGE="$T/stage"
 mkdir -p "$STAGE/codex/hooks" "$STAGE/codex/rules" "$STAGE/skills"
 
-# 1. 전역 규칙
-DROP="$DROP" awk '
-  BEGIN { n = split(ENVIRON["DROP"], p, "\n") }
-  { for (i = 1; i <= n; i++) if (index($0, p[i]) == 1) { c[i]++; next } print }
-  END {
-    for (i = 1; i <= n; i++)
-      if (c[i] != 1) {
-        printf "codex-sync: 뺄 줄이 %d번 걸린다: %s\n", c[i], p[i] > "/dev/stderr"
-        bad = 1
-      }
-    exit bad
-  }' "$SRC/CLAUDE.md" > "$T/rules.md"
-sed -e 's/CLAUDE\.md/AGENTS.md/g' -e 's/Claude Code/Codex/g' -e 's/Claude/Codex/g' \
-  "$T/rules.md" > "$STAGE/codex/AGENTS.md"
+# 1. 전역 규칙은 링크다. 사본이 없으니 원본과 어긋날 수 없다.
+#    링크는 덮어써도 잃을 것이 없어 비교 대상에서 뺀다.
+mkdir -p "$CODEX"
+ln -sfn "$SRC/CLAUDE.md" "$CODEX/AGENTS.md"
 
 # 2. 스킬은 이름을 바꾸지 않고 폴더째 옮긴다. 가져오기가 넣은 치환이 틀린 문장을 만들었고,
 #    저장소 규칙의 원본은 그 저장소의 CLAUDE.md 라 Codex 가 그 파일을 읽어도 된다.
@@ -88,7 +73,7 @@ sums() {  # sums <codex 뿌리> <스킬 뿌리> <스킬 이름…>
   k=$2
   shift 2
   # rules 는 폴더가 아니라 우리가 옮기는 파일 하나만 본다. 손으로 넣은 규칙까지 감시하면 매번 걸린다
-  for f in AGENTS.md hooks.json hooks rules/claude-deny.rules; do
+  for f in hooks.json hooks rules/claude-deny.rules; do
     [ -e "$c/$f" ] || continue
     (cd "$c" && find "$f" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
       sed 's|  |  codex/|'
@@ -132,7 +117,7 @@ fi
 # 5. 백업하고 옮긴다. 해시 기록은 모두 끝난 뒤에 쓴다
 B="$CODEX/claude-sync-backup/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$B/codex" "$B/skills"
-for f in AGENTS.md hooks.json hooks rules; do
+for f in hooks.json hooks rules; do
   [ -e "$CODEX/$f" ] && cp -R "$CODEX/$f" "$B/codex/" || true
 done
 for s in $NEW_NAMES $GONE; do
@@ -140,7 +125,7 @@ for s in $NEW_NAMES $GONE; do
 done
 
 mkdir -p "$CODEX/hooks" "$SKILLS"
-cp "$STAGE/codex/AGENTS.md" "$STAGE/codex/hooks.json" "$CODEX/"
+cp "$STAGE/codex/hooks.json" "$CODEX/"
 rsync -a --delete --exclude __pycache__ "$STAGE/codex/hooks/" "$CODEX/hooks/"
 mkdir -p "$CODEX/rules"
 rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
