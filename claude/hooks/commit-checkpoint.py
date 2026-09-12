@@ -3,6 +3,7 @@
 
 한 사이클(RED → GREEN)이 닫힌 자리가 곧 체크포인트다(~/.claude/CLAUDE.md 「커밋 체크포인트」·「TDD」).
 파일 개수로 재지 않는 이유는 여러 사이클이 한 파일에 쌓일 수 있어서다 — 「방금 초록이 됐다」가 실제 신호다.
+저장소는 명령 앞의 `cd {경로}` 를 따른다. 셸의 현재 폴더가 작업 저장소와 다를 때가 많다.
 """
 import json
 import re
@@ -10,6 +11,15 @@ import subprocess
 import sys
 
 from testrun import FAILURE, as_text, is_test_run
+
+
+CD = re.compile(r"^\s*cd\s+(\S+)\s*&&")
+
+
+def target_dir(command, fallback):
+    """명령 앞의 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더."""
+    m = CD.match(command or "")
+    return m.group(1) if m else fallback
 
 
 def main():
@@ -31,7 +41,8 @@ def main():
                   ensure_ascii=False))
         return
 
-    status = subprocess.run(["git", "status", "--porcelain"],
+    cwd = target_dir(command, payload.get("cwd") or None)
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=cwd,
                             capture_output=True, text=True, timeout=10)
     if status.returncode != 0:
         return
@@ -39,7 +50,7 @@ def main():
     if not changed:
         return
 
-    root = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+    root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
                           capture_output=True, text=True, timeout=10).stdout.strip()
 
     print(json.dumps({

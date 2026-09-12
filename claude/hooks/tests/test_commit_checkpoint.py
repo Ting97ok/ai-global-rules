@@ -64,6 +64,18 @@ class CommitCheckpoint(unittest.TestCase):
             )
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+    def test_명령_앞의_cd_가_가리키는_저장소를_센다(self):
+        with tempfile.TemporaryDirectory() as here, tempfile.TemporaryDirectory() as there:
+            subprocess.run(["git", "init", "-q"], cwd=here, check=True)
+            repo_with_change(there)
+            result = run(
+                f"cd {there} && python3 tests/test_x.py",
+                "Ran 1 test in 0.03s\n\nOK",
+                here,
+            )
+            self.assertIn("block", result.stdout)
+            self.assertIn(there, result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
