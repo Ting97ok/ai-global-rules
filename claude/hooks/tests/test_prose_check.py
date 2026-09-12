@@ -42,6 +42,18 @@ class ProseCheck(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stdout or "출력 없음")
             self.assertIn("전각 대시", result.stderr)
 
+    def test_셸로_고친_문서도_검사한다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "docs" / "b.md"
+            doc.parent.mkdir()
+            doc.write_text("이 훅은 산문만 본다 — 코드 블록은 건너뛴다.\n", encoding="utf-8")
+            result = run({
+                "hook_event_name": "PostToolUse", "tool_name": "Bash", "cwd": folder,
+                "tool_input": {"command": "printf '%s' \"$TEXT\" > docs/b.md"},
+            })
+            self.assertEqual(2, result.returncode, result.stdout or "출력 없음")
+            self.assertIn("전각 대시", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
