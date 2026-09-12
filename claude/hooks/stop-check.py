@@ -54,10 +54,16 @@ def codex_payload(row):
     return p if isinstance(p, dict) else None
 
 
+INJECTED = re.compile(r"<(hook_prompt|recommended_plugins|user_instructions|environment_context)\b")
+
+
 def is_human_turn(row):
     p = codex_payload(row)
     if p is not None:
-        return p.get("type") == "message" and p.get("role") == "user"
+        if p.get("type") != "message" or p.get("role") != "user":
+            return False
+        # 도구가 끼워 넣은 메시지도 user 역할로 들어온다. 훅 되먹임·플러그인 안내가 그렇다
+        return not INJECTED.search(as_text(p.get("content")))
     if row.get("type") != "user":
         return False
     blocks = content_blocks(row)
