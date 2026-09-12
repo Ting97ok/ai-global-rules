@@ -10,6 +10,7 @@
   6. 드래프트가 아닌 gh pr create, gh pr ready, gh pr merge 에 PR 본문 3항목이 없음
   7. PR 본문의 전각 대시 문장 잇기 (PR 본문도 문서 작성 규칙을 따른다)
   8. 브랜치의 두 번째 커밋인데 열린 PR 이 없음   드래프트 PR 을 먼저 연다
+  9. `검토:` 줄에 댓글 주소가 없음            그 결정을 남긴 PR 댓글을 단다
 
 종료 코드 2 + stderr 가 차단이다. 판단이 필요한 것은 여기 두지 않는다.
 """
@@ -23,6 +24,7 @@ import sys
 PREFIX = re.compile(r"^\[(Feat|Fix|HotFix|Docs|Test|Refactor)\]")
 SIGNATURE = re.compile(r"Co-Authored-By:\s*Claude|Generated with \[?Claude Code|🤖", re.IGNORECASE)
 SECTIONS = ("작업 내용", "검토에서 바뀐", "인수 확인")
+COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
 
 
 def fail(msg):
@@ -65,6 +67,14 @@ def current_branch(cwd):
     r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                        cwd=cwd or None, capture_output=True, text=True, timeout=10)
     return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def needs_comment_link(message):
+    """커밋 본문의 `검토:` 줄에 그 결정을 남긴 PR 댓글 주소가 없으면 True."""
+    for line in message.splitlines():
+        if line.strip().startswith("검토:"):
+            return not COMMENT_URL.search(line)
+    return False
 
 
 def commits_ahead(cwd):
@@ -149,6 +159,9 @@ def check_git(toks, cwd):
             for m in msgs:
                 if SIGNATURE.search(m):
                     fail("커밋 메시지에 도구 서명(Co-Authored-By: Claude / Generated with Claude Code)을 넣지 않는다")
+            for m in msgs:
+                if needs_comment_link(m):
+                    fail("`검토:` 줄에는 그 결정을 남긴 PR 댓글 주소를 단다. 댓글을 먼저 올리고 그 주소를 붙인다")
         branch = current_branch(cwd)
         ahead = commits_ahead(cwd) if branch not in ("", "main", "master", "HEAD") else 0
         if ahead == 1 and needs_pr(branch, ahead, pr_state(cwd)):
