@@ -44,3 +44,27 @@ for d in "$SRC"/skills/*/; do
   case " $NOT_SKILLS " in *" $s "*) continue ;; esac
   rsync -a --delete --exclude __pycache__ "$d" "$SKILLS/$s/"
 done
+
+# 훅은 스크립트를 옮기고 등록은 settings.json 에서 만든다.
+# doc-skill-guard 는 Codex 에 붙이지 않는다. Claude 의 Skill 도구 호출을 찾는 훅이라
+# Codex 에서는 하는 일 없이 신뢰 승인만 요구한다.
+NOT_HOOKS="doc-skill-guard.py"
+mkdir -p "$CODEX/hooks"
+rsync -a --delete --exclude __pycache__ --exclude tests "$SRC/hooks/" "$CODEX/hooks/"
+for h in $NOT_HOOKS; do rm -f "$CODEX/hooks/$h"; done
+
+# 이벤트 순서와 명령 꼴을 지금 hooks.json 과 같게 둔다. 훅 신뢰 승인이 그대로 유지된다.
+jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
+  def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
+  ($not | split(" ") | map(select(length > 0))) as $not
+  | .hooks as $h
+  | ({PreToolUse: $h.PreToolUse, PostToolUse: $h.PostToolUse, Stop: $h.Stop} + $h)
+  | with_entries(select(.value != null))
+  | map_values(map(.hooks |= map(select(.command as $c | all($not[]; . as $n | $c | contains($n) | not))))
+               | map(select(.hooks | length > 0)))
+  | with_entries(select(.value | length > 0))
+  | walk(if type == "object" and has("command") then
+           if (.command | test(pat)) then .command |= sub(pat; "python3 \($q)\($dir)\(.f)\($q)")
+           else error("codex-sync: 모르는 훅 명령 형식 \(.command)") end
+         else . end)
+  | {hooks: .}' "$SRC/settings.json" > "$CODEX/hooks.json"
