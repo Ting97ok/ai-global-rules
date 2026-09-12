@@ -17,6 +17,11 @@ class PrFirst(unittest.TestCase):
     def test_브랜치에_커밋이_하나_있는데_PR_이_없으면_막는다(self):
         self.assertTrue(git_guard.needs_pr("docs/doc-writing-skill", 1, False))
 
+    def test_검토_줄에_댓글_주소가_없으면_막는다(self):
+        self.assertTrue(git_guard.needs_comment_link("검토: 지적 → 바뀐 것"))
+        self.assertFalse(git_guard.needs_comment_link(
+            "검토: 지적 → 바뀐 것 (https://github.com/o/r/pull/2#issuecomment-1)"))
+
 
 if __name__ == "__main__":
     unittest.main()
