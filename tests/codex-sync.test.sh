@@ -68,14 +68,12 @@ S="$T/skills"
 [ -e "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
 [ -f "$S/find-skills/SKILL.md" ] && ok "Codex 에만 있는 스킬은 그대로 둔다" || no "Codex 에만 있는 스킬이 사라졌다"
 
-echo "훅을 옮긴다"
-H="$T/codex/hooks"
-[ -f "$H/git-guard.py" ] && ok "훅 스크립트를 옮긴다" || no "git-guard.py 가 없다"
-[ -f "$H/doc-skill-guard.py" ] && no "doc-skill-guard.py 를 옮겼다" || ok "doc-skill-guard 는 옮기지 않는다"
+echo "훅은 원본을 그대로 가리킨다"
+[ -d "$T/codex/hooks" ] && no "훅 사본을 만들었다" || ok "훅 사본을 만들지 않는다"
 J="$T/codex/hooks.json"
 if [ -f "$J" ]; then
   ok "hooks.json 을 만든다"
-  grep -q "'$H/git-guard.py'" "$J" && ok "훅 경로를 Codex 자리로 바꾼다" || no "훅 경로가 Codex 자리가 아니다"
+  grep -q "'$T/claude/hooks/git-guard.py'" "$J" && ok "원본 경로를 가리킨다" || no "원본 경로가 아니다"
   grep -q "doc-skill-guard" "$J" && no "hooks.json 에 doc-skill-guard 가 남았다" || ok "hooks.json 에서 doc-skill-guard 를 뺀다"
 else
   no "hooks.json 이 없다"
@@ -87,14 +85,14 @@ grep -q "Codex 쪽에서 고쳤다" "$T/claude/skills/doc-writing/SKILL.md" \
   && ok "원본이 같이 바뀐다" || no "원본이 안 바뀌었다"
 
 echo "사본으로 남는 것은 Codex 쪽 수정을 덮지 않는다"
-echo "# 손으로 고쳤다" >> "$H/git-guard.py"
+echo "# 손으로 고쳤다" >> "$T/codex/rules/claude-deny.rules"
 if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
    sh "$SCRIPT" > "$T/out2" 2>&1; then
   no "-f 없이 덮었다"
 else
   ok "덮지 않고 멈춘다"
-  grep -q "git-guard" "$T/out2" && ok "바뀐 파일을 알려 준다" || no "바뀐 파일을 알려 주지 않는다"
-  grep -q "손으로 고쳤다" "$H/git-guard.py" \
+  grep -q "claude-deny" "$T/out2" && ok "바뀐 파일을 알려 준다" || no "바뀐 파일을 알려 주지 않는다"
+  grep -q "손으로 고쳤다" "$T/codex/rules/claude-deny.rules" \
     && ok "Codex 쪽 수정이 그대로 있다" || no "Codex 쪽 수정이 사라졌다"
 fi
 
