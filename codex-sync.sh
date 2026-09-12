@@ -115,6 +115,8 @@ for f in hooks.json rules; do
 done
 
 cp "$STAGE/codex/hooks.json" "$CODEX/"
+# 예전 방식이 남긴 훅 사본을 치운다. 백업에 들어 있다
+[ -d "$CODEX/hooks" ] && cp -R "$CODEX/hooks" "$B/codex/" && rm -rf "${CODEX:?}/hooks"
 mkdir -p "$CODEX/rules"
 rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
 
