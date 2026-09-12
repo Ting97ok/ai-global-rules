@@ -29,7 +29,7 @@ NOT_HOOKS="doc-skill-guard.py"
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 STAGE="$T/stage"
-mkdir -p "$STAGE/codex/hooks" "$STAGE/codex/rules" "$STAGE/skills"
+mkdir -p "$STAGE/codex/hooks" "$STAGE/codex/rules"
 
 # 1. 전역 규칙은 링크다. 사본이 없으니 원본과 어긋날 수 없다.
 #    링크는 덮어써도 잃을 것이 없어 비교 대상에서 뺀다.
@@ -39,10 +39,16 @@ ln -sfn "$SRC/CLAUDE.md" "$CODEX/AGENTS.md"
 # 2. 스킬은 이름을 바꾸지 않고 폴더째 옮긴다. 가져오기가 넣은 치환이 틀린 문장을 만들었고,
 #    저장소 규칙의 원본은 그 저장소의 CLAUDE.md 라 Codex 가 그 파일을 읽어도 된다.
 #    Codex 에만 있는 폴더(find-skills, source-command-*)는 목록에 없어서 건드리지 않는다.
+mkdir -p "$SKILLS"
 for d in "$SRC"/skills/*/; do
   s=$(basename "$d")
   case " $NOT_SKILLS " in *" $s "*) continue ;; esac
-  rsync -a --exclude __pycache__ "$d" "$STAGE/skills/$s/"
+  rm -rf "${SKILLS:?}/$s"          # 예전 사본이 있으면 그 안에 링크가 생긴다
+  ln -sfn "${d%/}" "$SKILLS/$s"
+done
+# 원본에서 사라진 스킬은 끊어진 링크로 남는다. 그것만 치운다
+for l in "$SKILLS"/*; do
+  [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
 done
 
 # 3. 훅은 스크립트를 옮기고 등록은 settings.json 에서 만든다.
@@ -68,34 +74,19 @@ jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   | {hooks: .}' "$SRC/settings.json" > "$STAGE/codex/hooks.json"
 
 # 4. 새로 만든 것 / 지금 대상 / 지난 복사 기록을 비교한다
-sums() {  # sums <codex 뿌리> <스킬 뿌리> <스킬 이름…>
+sums() {  # sums <codex 뿌리>
   c=$1
-  k=$2
-  shift 2
   # rules 는 폴더가 아니라 우리가 옮기는 파일 하나만 본다. 손으로 넣은 규칙까지 감시하면 매번 걸린다
   for f in hooks.json hooks rules/claude-deny.rules; do
     [ -e "$c/$f" ] || continue
     (cd "$c" && find "$f" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
       sed 's|  |  codex/|'
   done
-  for s in "$@"; do
-    [ -e "$k/$s" ] || continue
-    (cd "$k" && find "$s" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
-      sed 's|  |  skills/|'
-  done
 }
 changed() { diff "$1" "$2" | sed -n 's/^[<>] [0-9a-f]*  //p' | sort -u; }
 
-NEW_NAMES=$(ls "$STAGE/skills" | tr '\n' ' ')
-OLD_NAMES=""
-[ -f "$STATE" ] && OLD_NAMES=$(sed -n 's|^[0-9a-f]*  skills/\([^/]*\)/.*|\1|p' "$STATE" | sort -u | tr '\n' ' ')
-GONE=""
-for s in $OLD_NAMES; do
-  case " $NEW_NAMES " in *" $s "*) ;; *) GONE="$GONE $s" ;; esac
-done
-
-sums "$STAGE/codex" "$STAGE/skills" $NEW_NAMES | sort -k2 > "$T/new.sha256"
-sums "$CODEX" "$SKILLS" $NEW_NAMES $GONE | sort -k2 > "$T/now.sha256"
+sums "$STAGE/codex" | sort -k2 > "$T/new.sha256"
+sums "$CODEX" | sort -k2 > "$T/now.sha256"
 
 if cmp -s "$T/new.sha256" "$T/now.sha256"; then
   echo "codex-sync: Codex 쪽이 이미 원본과 같다"
@@ -116,24 +107,16 @@ fi
 
 # 5. 백업하고 옮긴다. 해시 기록은 모두 끝난 뒤에 쓴다
 B="$CODEX/claude-sync-backup/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$B/codex" "$B/skills"
+mkdir -p "$B/codex"
 for f in hooks.json hooks rules; do
   [ -e "$CODEX/$f" ] && cp -R "$CODEX/$f" "$B/codex/" || true
 done
-for s in $NEW_NAMES $GONE; do
-  [ -e "$SKILLS/$s" ] && cp -R "$SKILLS/$s" "$B/skills/" || true
-done
 
-mkdir -p "$CODEX/hooks" "$SKILLS"
+mkdir -p "$CODEX/hooks"
 cp "$STAGE/codex/hooks.json" "$CODEX/"
 rsync -a --delete --exclude __pycache__ "$STAGE/codex/hooks/" "$CODEX/hooks/"
 mkdir -p "$CODEX/rules"
 rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
-for s in $NEW_NAMES; do
-  rsync -a --delete --exclude __pycache__ "$STAGE/skills/$s/" "$SKILLS/$s/"
-done
-# 지난 기록에는 있는데 이번에 옮기지 않는 스킬은 지운다. 백업에 남아 있다
-for s in $GONE; do rm -rf "${SKILLS:?}/$s"; done
 
 cp "$T/new.sha256" "$STATE"
 echo "codex-sync: 옮겼다. 이전 상태는 $B 에 있다"
