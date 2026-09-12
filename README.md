@@ -54,7 +54,9 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 | `prose-check.py` | 입력 형식이 달라 검사하지 못한다 |
 | `memory-note.py` | 입력 형식이 달라 검사하지 못한다 |
 | `agent-guard.py` | 해당 도구가 없다 |
-| `doc-skill-guard.py` | 등록하지 않는다 |
+| `doc-skill-guard.py` | 등록하지 않는다. Claude 의 스킬 호출 기록에 기대는 훅이다 |
+
+Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 부르라고 지시한다. 누락을 자동으로 막지는 않는다.
 
 훅 테스트는 `python3 claude/hooks/tests/test_stop_check.py` 처럼 파일을 직접 돌린다. Codex 복사 테스트는 `sh tests/codex-sync.test.sh` 다.
 
