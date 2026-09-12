@@ -28,8 +28,13 @@ for c in "git status --short" "git commit -m x" "git stash list" "rm a.txt"; do
   [ "$(decision $c)" = "없음" ] && ok "$c" || no "$c"
 done
 
+echo "깃발 순서가 달라도 막는다"
+for c in "git push origin --force" "git push upstream -f" "rm -f -r build" "rm -f -R build"; do
+  [ "$(decision $c)" = "forbidden" ] && ok "$c" || no "$c"
+done
+
 echo "못 막는 것 — 규칙 파일 끝에 적은 한계"
-for c in "git push origin --force" "rm -f -r build"; do
+for c in "git push mirror --force" "rm -i -f -r build"; do
   [ "$(decision $c)" = "없음" ] && ok "$c" || no "$c 를 막았다. 한계 설명을 고친다"
 done
 
