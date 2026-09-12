@@ -15,7 +15,7 @@ import json
 import re
 import sys
 
-from testrun import FAILURE, as_text, is_test_run
+from testrun import FAILURE, as_text, is_test_run, run_failed, shell_command
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -48,7 +48,22 @@ def content_blocks(row):
     return c if isinstance(c, list) else []
 
 
+def codex_payload(row):
+    """Codex 기록의 payload. Claude 기록이면 None."""
+    p = row.get("payload")
+    return p if isinstance(p, dict) else None
+
+
+INJECTED = re.compile(r"<(hook_prompt|recommended_plugins|user_instructions|environment_context)\b")
+
+
 def is_human_turn(row):
+    p = codex_payload(row)
+    if p is not None:
+        if p.get("type") != "message" or p.get("role") != "user":
+            return False
+        # 도구가 끼워 넣은 메시지도 user 역할로 들어온다. 훅 되먹임·플러그인 안내가 그렇다
+        return not INJECTED.search(as_text(p.get("content")))
     if row.get("type") != "user":
         return False
     blocks = content_blocks(row)
@@ -77,6 +92,19 @@ def main():
     ran_commands, last_text = [], ""
     commands, last_test_failed = {}, False
     for r in turn:
+        p = codex_payload(r)
+        if p is not None:
+            t = p.get("type")
+            if t == "custom_tool_call":
+                command = shell_command(p.get("input"))
+                ran_commands.append(command)
+                commands[p.get("call_id")] = command
+            elif t == "custom_tool_call_output":
+                if is_test_run(commands.get(p.get("call_id"), "")):
+                    last_test_failed = run_failed(p.get("output"))
+            elif t == "message" and p.get("role") == "assistant":
+                last_text = as_text(p.get("content"))
+            continue
         kind = r.get("type")
         if kind == "assistant":
             texts = []

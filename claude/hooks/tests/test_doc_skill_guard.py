@@ -67,6 +67,25 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_셸로_문서를_고쳐도_막는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = run({
+                "hook_event_name": "PreToolUse", "tool_name": "Bash",
+                "tool_input": {"command": 'python3 -c \'import pathlib; pathlib.Path("README.md").write_text("x")\''},
+                "transcript_path": transcript([], folder),
+            })
+            self.assertEqual(2, result.returncode, result.stderr)
+            self.assertIn("doc-writing", result.stderr)
+
+    def test_셸로_문서를_읽기만_하면_막지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = run({
+                "hook_event_name": "PreToolUse", "tool_name": "Bash",
+                "tool_input": {"command": "grep -n 복사 README.md | head -5"},
+                "transcript_path": transcript([], folder),
+            })
+            self.assertEqual(0, result.returncode, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

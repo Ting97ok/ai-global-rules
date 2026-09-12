@@ -46,3 +46,77 @@ def is_test_run(command):
     skeleton = HEREDOC.sub(" ", command or "")
     skeleton = QUOTED.sub(" ", skeleton)
     return bool(RUNNER.search(skeleton))
+
+
+REDIRECT = re.compile(r">>?\s*['\"]?([\w./~+$-]+\.(?:md|html))")
+TEE = re.compile(r"\btee\b\s+(?:-a\s+)?['\"]?([\w./~+$-]+\.(?:md|html))")
+SED_I = re.compile(r"\bsed\b[^|;]*?-i[^|;]*?([\w./~+-]+\.(?:md|html))")
+PY_WRITE = re.compile(r"write_text|writelines|\.write\(|open\([^)]*['\"][wa]")
+ANY_DOC = re.compile(r"[\w./~+-]+\.(?:md|html)")
+
+
+def written_paths(command):
+    """셸 명령이 문서를 고치는 것으로 보이면 그 경로를 낸다.
+
+    문서 훅은 Write·Edit 도구에만 걸려서, 셸로 고치면 그대로 빠져나간다.
+    리디렉션·tee·sed -i 는 대상이 명령에 드러나고, 파이썬으로 쓸 때는 경로가 본문 안에 있다.
+    """
+    if not command:
+        return []
+    found = REDIRECT.findall(command) + TEE.findall(command) + SED_I.findall(command)
+    if PY_WRITE.search(command):
+        found += ANY_DOC.findall(command)
+    return found
+
+
+PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update) File: (.+)$", re.M)
+
+
+def edited_paths(payload):
+    """이번 편집이 건드린 파일 경로.
+
+    Claude 는 tool_input.file_path 로 준다. Codex 는 apply_patch 의 패치 본문으로 줘서
+    `*** Add File:` `*** Update File:` 줄에서 뽑고 cwd 를 앞에 붙인다.
+    """
+    import os
+
+    tool_input = payload.get("tool_input") or {}
+    one = tool_input.get("file_path")
+    if one:
+        return [one]
+    command = tool_input.get("command") or ""
+    found = PATCH_FILE.findall(command) or written_paths(command)
+    cwd = payload.get("cwd") or ""
+    return [os.path.join(cwd, p.strip()) if cwd else p.strip() for p in found]
+
+
+CODEX_CMD = re.compile(r'cmd\s*:\s*"((?:[^"\\\\]|\\\\.)*)"')
+
+
+def shell_command(raw):
+    """셸 호출 기록에서 실제 명령을 꺼낸다.
+
+    Claude 는 명령 문자열을 그대로 준다. Codex 는 `tools.exec_command({cmd:"…"})` 로 감싸서
+    명령이 따옴표 안에 들어간다. 감싼 채로 두면 인용 구간을 지우는 판정이 명령까지 지운다.
+    한 호출에 명령이 여럿 담기므로 모두 꺼내 줄바꿈으로 잇는다.
+    """
+    found = CODEX_CMD.findall(raw or "")
+    if not found:
+        return raw or ""
+    return "\n".join(c.replace('\\"', '"').replace("\\\\", "\\") for c in found)
+
+
+EXIT_CODE = re.compile(r'"exit_code"\s*:\s*(\d+)')
+
+
+def run_failed(output):
+    """실행 결과가 실패인지 본다.
+
+    Codex 는 출력을 JSON 조각으로 감싸면서 종료 코드를 남긴다. 그 안의 줄바꿈은 두 글자가 되어
+    문구 검사가 낱말 경계를 놓치므로, 종료 코드가 있으면 그것을 먼저 본다.
+    """
+    text = as_text(output)
+    codes = EXIT_CODE.findall(text)
+    if codes:
+        return any(c != "0" for c in codes)
+    return bool(FAILURE.search(text))

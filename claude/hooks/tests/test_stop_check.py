@@ -93,6 +93,86 @@ class StopCheck(unittest.TestCase):
             result = run(transcript(rows, folder))
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+def codex_call(call_id, command):
+    return {"type": "response_item", "payload": {
+        "type": "custom_tool_call", "call_id": call_id, "name": "exec",
+        "input": 'text(await tools.exec_command({cmd:"%s"}))' % command}}
+
+
+def codex_result(call_id, output):
+    return {"type": "response_item", "payload": {
+        "type": "custom_tool_call_output", "call_id": call_id,
+        "output": [{"type": "input_text", "text": output}]}}
+
+
+def codex_message(role, text):
+    key = "input_text" if role == "user" else "output_text"
+    return {"type": "response_item", "payload": {
+        "type": "message", "role": role, "content": [{"type": key, "text": text}]}}
+
+
+class StopCheckCodex(unittest.TestCase):
+    def test_Codex_기록에서도_빨간_상태의_커밋_명령을_막는다(self):
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("block", result.stdout)
+            self.assertIn("GREEN", result.stdout)
+
+    def test_도구가_끼워_넣은_메시지는_사람_발화로_보지_않는다(self):
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "FAIL: test_x\nFAILED (failures=1)"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("user", '<hook_prompt hook_run_id="stop:5:/x/hooks.json">[stop-check] 이전 지적</hook_prompt>'),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+            self.assertNotIn("상태를 확인한다", result.stdout)
+
+    def test_Codex_출력의_종료_코드로_실패를_읽는다(self):
+        chunk = ('{"chunk_id":"8f72b7","exit_code":1,'
+                 '"output":"F\\n====\\nFAIL: test_x\\n----\\nAssertionError\\n"}')
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "Script completed\nWall time 2.9 seconds\nOutput:\n"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        rows[2]["payload"]["output"].append({"type": "input_text", "text": chunk})
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+
+    def test_한_호출에_담긴_명령을_모두_본다(self):
+        many = ('text(await tools.exec_command({cmd:"cat SKILL.md",max_output_tokens:3000}));\n'
+                'text(await tools.exec_command({cmd:"python3 tests/test_x.py",max_output_tokens:2000}));\n'
+                'text(await tools.exec_command({cmd:"git status --short",max_output_tokens:2000}));')
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            {"type": "response_item", "payload": {
+                "type": "custom_tool_call", "call_id": "c1", "name": "exec", "input": many}},
+            codex_result("c1", '{"exit_code":1,"output":"FAIL"}'),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+            self.assertNotIn("상태를 확인한다", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

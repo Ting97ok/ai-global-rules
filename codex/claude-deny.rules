@@ -1,0 +1,74 @@
+# Codex 권한 차단 규칙. claude/settings.json 의 permissions.deny 에 해당한다.
+# prefix_rule 은 인자 단위로 앞에서부터 맞춘다. 그래서 옮길 수 있는 것만 손으로 옮기고
+# 옮기지 못한 것은 아래 「옮기지 못한 것」에 적는다.
+# 확인은 tests/codex-rules.test.sh 가 codex execpolicy check 로 한다.
+
+prefix_rule(
+    pattern = ["git", "rebase"],
+    decision = "forbidden",
+    justification = "PR 브랜치 이력을 다시 쓰면 댓글과 커밋의 연결이 끊긴다",
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "강제 푸시는 이력을 덮어쓴다",
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--force", "-f", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "강제 푸시는 이력을 덮어쓴다",
+)
+
+prefix_rule(
+    pattern = ["git", "reset"],
+    decision = "forbidden",
+    justification = "되돌리기 어려운 이력 조작이다",
+)
+
+prefix_rule(
+    pattern = ["git", "checkout", "--"],
+    decision = "forbidden",
+    justification = "작업 트리의 변경을 되돌린다",
+)
+
+prefix_rule(
+    pattern = ["git", "restore"],
+    decision = "forbidden",
+    justification = "작업 트리의 변경을 되돌린다",
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "forbidden",
+    justification = "추적하지 않는 파일을 지운다",
+)
+
+prefix_rule(
+    pattern = ["git", "stash", ["drop", "clear"]],
+    decision = "forbidden",
+    justification = "보관한 변경을 지운다",
+)
+
+prefix_rule(
+    pattern = ["git", "branch", "-D"],
+    decision = "forbidden",
+    justification = "합치지 않은 브랜치를 지운다",
+)
+
+prefix_rule(
+    pattern = ["rm", ["-r", "-R", "-rf", "-fr", "-Rf", "-fR"]],
+    decision = "forbidden",
+    justification = "폴더를 통째로 지운다",
+)
+
+prefix_rule(
+    pattern = ["rm", "-f", ["-r", "-R"]],
+    decision = "forbidden",
+    justification = "폴더를 통째로 지운다",
+)
+
+# 옮기지 못한 것. prefix_rule 은 인자를 앞에서부터 맞춰서, 올 수 있는 자리를 하나씩 적어야 한다.
+# - `git push mirror --force` 처럼 origin·upstream 이 아닌 원격 이름.
+# - `rm -i -f -r` 처럼 깃발이 셋 이상으로 갈린 꼴.

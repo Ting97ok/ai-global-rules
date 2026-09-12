@@ -12,52 +12,66 @@ SRC="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CODEX="${CODEX_HOME:-$HOME/.codex}"
 SKILLS="${AGENTS_SKILLS:-$HOME/.agents/skills}"
 STATE="$CODEX/claude-sync.sha256"
+RULES="$(dirname "$0")/codex/claude-deny.rules"   # 이 저장소가 원본이다
 FORCE=0
 [ "${1:-}" = "-f" ] && FORCE=1
+
+# 저장소 규칙은 옮기지 않는다. Codex 가 그 저장소의 CLAUDE.md 를 직접 읽게 두고 설정만 확인한다.
+# 이 키가 없으면 저장소가 정한 것이 Codex 에 하나도 안 간다.
+grep -q '^[^#]*project_doc_fallback_filenames.*CLAUDE\.md' "$CODEX/config.toml" 2>/dev/null ||
+  echo "codex-sync: config.toml 에 project_doc_fallback_filenames = [\"CLAUDE.md\"] 가 없다. 저장소 CLAUDE.md 를 Codex 가 읽지 않는다"
+
+# 전역 규칙이 링크라 Claude 전용 줄을 뺄 수 없다. Codex 쪽에서 그 두 줄을 바로잡는다.
+grep -q '^[^#]*developer_instructions' "$CODEX/config.toml" 2>/dev/null ||
+  echo "codex-sync: config.toml 에 developer_instructions 가 없다. 교차 검증과 doc-skill-guard 는 Claude 전용인데 전역 규칙에 그대로 남아 있다"
 
 # Codex 에 옮기지 않는 스킬. Codex 가 자기 자신과 교차 검증하게 된다
 NOT_SKILLS="codex-cross-check"
 # Codex 에 붙이지 않는 훅. Claude 의 Skill 도구 호출을 찾는 훅이라
 # Codex 에서는 하는 일 없이 신뢰 승인만 요구한다
 NOT_HOOKS="doc-skill-guard.py"
-# Claude 에만 맞는 줄의 첫머리. 원본에서 한 번씩만 걸려야 한다.
-# 규칙 문장이 바뀌면 여기서 멈춘다. 조용히 새는 것보다 낫다.
-DROP='- **교차 검증**:
-문서 파일을 쓰기 전에 스킬을 불렀는지는 훅(`doc-skill-guard.py`)이 확인한다.'
-
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 STAGE="$T/stage"
-mkdir -p "$STAGE/codex/hooks" "$STAGE/skills"
+mkdir -p "$STAGE/codex/rules"
 
-# 1. 전역 규칙
-DROP="$DROP" awk '
-  BEGIN { n = split(ENVIRON["DROP"], p, "\n") }
-  { for (i = 1; i <= n; i++) if (index($0, p[i]) == 1) { c[i]++; next } print }
-  END {
-    for (i = 1; i <= n; i++)
-      if (c[i] != 1) {
-        printf "codex-sync: 뺄 줄이 %d번 걸린다: %s\n", c[i], p[i] > "/dev/stderr"
-        bad = 1
-      }
-    exit bad
-  }' "$SRC/CLAUDE.md" > "$T/rules.md"
-sed -e 's/CLAUDE\.md/AGENTS.md/g' -e 's/Claude Code/Codex/g' -e 's/Claude/Codex/g' \
-  "$T/rules.md" > "$STAGE/codex/AGENTS.md"
+# 1. 전역 규칙은 링크다. 사본이 없으니 원본과 어긋날 수 없다.
+#    링크는 덮어써도 잃을 것이 없어 비교 대상에서 뺀다.
+mkdir -p "$CODEX"
+ln -sfn "$SRC/CLAUDE.md" "$CODEX/AGENTS.md"
 
 # 2. 스킬은 이름을 바꾸지 않고 폴더째 옮긴다. 가져오기가 넣은 치환이 틀린 문장을 만들었고,
 #    저장소 규칙의 원본은 그 저장소의 CLAUDE.md 라 Codex 가 그 파일을 읽어도 된다.
 #    Codex 에만 있는 폴더(find-skills, source-command-*)는 목록에 없어서 건드리지 않는다.
+mkdir -p "$SKILLS"
 for d in "$SRC"/skills/*/; do
   s=$(basename "$d")
   case " $NOT_SKILLS " in *" $s "*) continue ;; esac
-  rsync -a --exclude __pycache__ "$d" "$STAGE/skills/$s/"
+  rm -rf "${SKILLS:?}/$s"          # 예전 사본이 있으면 그 안에 링크가 생긴다
+  ln -sfn "${d%/}" "$SKILLS/$s"
+done
+# 원본에서 사라진 스킬은 끊어진 링크로 남는다. 그것만 치운다
+for l in "$SKILLS"/*; do
+  [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
 done
 
-# 3. 훅은 스크립트를 옮기고 등록은 settings.json 에서 만든다.
-#    이벤트 순서와 명령 꼴을 지금 hooks.json 과 같게 둔다. 훅 신뢰 승인이 그대로 유지된다.
-rsync -a --exclude __pycache__ --exclude tests "$SRC/hooks/" "$STAGE/codex/hooks/"
-for h in $NOT_HOOKS; do rm -f "$STAGE/codex/hooks/$h"; done
+# 3. 훅은 자리를 지키고 파일만 링크로 바꾼다.
+#    hooks.json 의 명령이 바뀌면 Codex 의 훅 신뢰 승인이 풀려 훅이 조용히 멈춘다.
+mkdir -p "$CODEX/hooks"
+find "$CODEX/hooks" -type f -delete 2>/dev/null || true   # 예전 사본을 치운다
+for f in "$SRC"/hooks/*.py; do
+  h=$(basename "$f")
+  case " $NOT_HOOKS " in *" $h "*) continue ;; esac
+  ln -sfn "$f" "$CODEX/hooks/$h"
+done
+# 원본에서 사라진 훅은 끊어진 링크로 남는다
+for l in "$CODEX"/hooks/*; do
+  [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
+done
+
+# 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
+[ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
+
 jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
@@ -74,33 +88,19 @@ jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   | {hooks: .}' "$SRC/settings.json" > "$STAGE/codex/hooks.json"
 
 # 4. 새로 만든 것 / 지금 대상 / 지난 복사 기록을 비교한다
-sums() {  # sums <codex 뿌리> <스킬 뿌리> <스킬 이름…>
+sums() {  # sums <codex 뿌리>
   c=$1
-  k=$2
-  shift 2
-  for f in AGENTS.md hooks.json hooks; do
+  # rules 는 폴더가 아니라 우리가 옮기는 파일 하나만 본다. 손으로 넣은 규칙까지 감시하면 매번 걸린다
+  for f in hooks.json rules/claude-deny.rules; do
     [ -e "$c/$f" ] || continue
     (cd "$c" && find "$f" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
       sed 's|  |  codex/|'
   done
-  for s in "$@"; do
-    [ -e "$k/$s" ] || continue
-    (cd "$k" && find "$s" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
-      sed 's|  |  skills/|'
-  done
 }
 changed() { diff "$1" "$2" | sed -n 's/^[<>] [0-9a-f]*  //p' | sort -u; }
 
-NEW_NAMES=$(ls "$STAGE/skills" | tr '\n' ' ')
-OLD_NAMES=""
-[ -f "$STATE" ] && OLD_NAMES=$(sed -n 's|^[0-9a-f]*  skills/\([^/]*\)/.*|\1|p' "$STATE" | sort -u | tr '\n' ' ')
-GONE=""
-for s in $OLD_NAMES; do
-  case " $NEW_NAMES " in *" $s "*) ;; *) GONE="$GONE $s" ;; esac
-done
-
-sums "$STAGE/codex" "$STAGE/skills" $NEW_NAMES | sort -k2 > "$T/new.sha256"
-sums "$CODEX" "$SKILLS" $NEW_NAMES $GONE | sort -k2 > "$T/now.sha256"
+sums "$STAGE/codex" | sort -k2 > "$T/new.sha256"
+sums "$CODEX" | sort -k2 > "$T/now.sha256"
 
 if cmp -s "$T/new.sha256" "$T/now.sha256"; then
   echo "codex-sync: Codex 쪽이 이미 원본과 같다"
@@ -121,22 +121,14 @@ fi
 
 # 5. 백업하고 옮긴다. 해시 기록은 모두 끝난 뒤에 쓴다
 B="$CODEX/claude-sync-backup/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$B/codex" "$B/skills"
-for f in AGENTS.md hooks.json hooks; do
+mkdir -p "$B/codex"
+for f in hooks.json rules; do
   [ -e "$CODEX/$f" ] && cp -R "$CODEX/$f" "$B/codex/" || true
 done
-for s in $NEW_NAMES $GONE; do
-  [ -e "$SKILLS/$s" ] && cp -R "$SKILLS/$s" "$B/skills/" || true
-done
 
-mkdir -p "$CODEX/hooks" "$SKILLS"
-cp "$STAGE/codex/AGENTS.md" "$STAGE/codex/hooks.json" "$CODEX/"
-rsync -a --delete --exclude __pycache__ "$STAGE/codex/hooks/" "$CODEX/hooks/"
-for s in $NEW_NAMES; do
-  rsync -a --delete --exclude __pycache__ "$STAGE/skills/$s/" "$SKILLS/$s/"
-done
-# 지난 기록에는 있는데 이번에 옮기지 않는 스킬은 지운다. 백업에 남아 있다
-for s in $GONE; do rm -rf "${SKILLS:?}/$s"; done
+cp "$STAGE/codex/hooks.json" "$CODEX/"
+mkdir -p "$CODEX/rules"
+rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
 
 cp "$T/new.sha256" "$STATE"
 echo "codex-sync: 옮겼다. 이전 상태는 $B 에 있다"

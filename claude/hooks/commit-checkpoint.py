@@ -13,13 +13,39 @@ import sys
 from testrun import FAILURE, as_text, is_test_run
 
 
-CD = re.compile(r"^\s*cd\s+(\S+)\s*&&")
+CD = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(\S+)\s*&&")
+VARIABLE = re.compile(r"[$`]")
+TEST_PATH = re.compile(r"\S*(?:test_\w+\.py|\.test\.sh)")
 
 
 def target_dir(command, fallback):
-    """명령 앞의 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더."""
-    m = CD.match(command or "")
-    return m.group(1) if m else fallback
+    """명령 안의 마지막 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더.
+
+    경로가 변수면 셸을 돌려야 알 수 있다. 그때는 모른다고 답해 엉뚱한 저장소를 세지 않는다.
+    """
+    found = CD.findall(command or "")
+    if not found:
+        return fallback
+    return False if VARIABLE.search(found[-1]) else found[-1]
+
+
+def related(command, root):
+    """명령이 돌린 테스트 파일이 이 저장소 안에 있는지.
+
+    셸의 현재 폴더가 작업 저장소와 다를 때가 있다. 그때 남의 저장소의 미커밋 변경을
+    세지 않으려고 본다. 경로를 적지 않는 명령(`./gradlew test`)은 현재 폴더에서 도니 통과다.
+    """
+    import os
+
+    paths = TEST_PATH.findall(command or "")
+    if not paths:
+        return True
+    root = os.path.realpath(root)
+    for p in paths:
+        full = os.path.realpath(os.path.join(root, os.path.expanduser(p)))
+        if full == root or full.startswith(root + os.sep):
+            return True
+    return False
 
 
 def main():
@@ -42,6 +68,8 @@ def main():
         return
 
     cwd = target_dir(command, payload.get("cwd") or None)
+    if cwd is False:   # 변수라 어느 저장소인지 모른다
+        return
     status = subprocess.run(["git", "status", "--porcelain"], cwd=cwd,
                             capture_output=True, text=True, timeout=10)
     if status.returncode != 0:
@@ -52,6 +80,8 @@ def main():
 
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
                           capture_output=True, text=True, timeout=10).stdout.strip()
+    if not root or not related(command, root):
+        return
 
     print(json.dumps({
         "decision": "block",

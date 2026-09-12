@@ -19,7 +19,7 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 리뷰로 방향이 바뀌면 댓글을 먼저 남기고 커밋한다는 규칙은 아직 공개 사례로 제시하지 못했다.
 
-이 저장소 자체의 검사도 공개한다. [훅 테스트](claude/hooks/tests/)와 [Codex 복사 테스트](tests/codex-sync.test.sh)가 문서 작성 스킬 호출 누락, 테스트가 실패한 상태의 커밋 명령, Codex 쪽 수정 덮어쓰기를 검사한다.
+이 저장소 자체의 검사도 공개한다. [훅 테스트](claude/hooks/tests/)가 문서 작성 스킬 호출 누락과 테스트가 실패한 상태의 커밋 명령을 검사하고, [Codex 연결 테스트](tests/codex-sync.test.sh)가 링크와 덮어쓰기 방지를, [권한 규칙 테스트](tests/codex-rules.test.sh)가 Codex 에서 막아야 하는 명령을 검사한다.
 
 [이 작업 방식이 만들어진 과정과 남은 고민 읽기](https://ting97ok.github.io/ai-global-rules/)
 
@@ -42,27 +42,45 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 <details>
 <summary>Codex 적용 범위와 테스트 실행</summary>
 
-원본은 `~/.claude` 한 곳이다. [codex-sync.sh](codex-sync.sh) 가 전역 규칙에서 Claude 에만 맞는 줄을 빼고 이름을 바꿔 `~/.codex/AGENTS.md` 로 만들고, 스킬은 이름을 바꾸지 않고 폴더째 옮긴다. 옮기기 전에 지금 상태를 백업하고, Codex 쪽에서 따로 고친 파일이 있으면 덮지 않고 멈춘다.
+전역 규칙과 스킬, 훅은 `~/.claude` 에 한 벌만 둔다. Codex 가 읽는 자리에는 그 원본을 가리키는 링크를 건다. [codex-sync.sh](codex-sync.sh) 가 `~/.codex/AGENTS.md`, `~/.agents/skills/`, `~/.codex/hooks/` 에 링크를 만든다. 사본이 없으니 원본을 고치면 Codex 쪽도 같이 바뀐다.
 
-`codex-cross-check` 스킬은 옮기지 않는다. Codex 가 자기 자신에게 교차 검증을 요청하게 된다.
+처음에는 복사했다. 저장소마다 둔 `AGENTS.md` 사본에서 치환이 틀려 `~/.Codex/` 라는 없는 경로를 가리키는 것을 발견하고 링크로 바꿨다.
+
+훅은 자리를 지키고 파일만 링크다. Codex 는 훅 명령 문자열로 신뢰 승인을 잡아서, `hooks.json` 의 경로를 바꾸면 승인이 풀리고 훅이 조용히 멈춘다.
+
+사본으로 남는 것은 둘이다. 훅 등록 파일 `hooks.json` 은 `settings.json` 에서 생성하고, 권한 규칙은 이 저장소의 [codex/claude-deny.rules](codex/claude-deny.rules) 가 원본이다. 이 둘만 Codex 쪽에서 고쳤는지 확인하고, 고친 것이 있으면 바뀔 목록을 보여 주고 멈춘다. 확인한 뒤 `-f` 를 주면 덮는다.
+
+`codex-cross-check` 스킬은 링크하지 않는다. Codex 가 자기 자신에게 교차 검증을 요청하게 된다.
+
+전역 규칙이 링크라 Claude 전용 문장을 뺄 수 없다. 교차 검증과 `doc-skill-guard` 두 줄이 그렇다. `config.toml` 의 `developer_instructions` 에 Codex 에는 해당하지 않는다고 적어 바로잡는다.
+
+`git-guard.py` 는 훅 입력의 셸 명령을 그대로 검사한다. Codex 도 명령을 그대로 넘겨서 처음부터 동작했다. `stop-check.py` 는 대화 기록에서 명령을 꺼내는데, Codex 는 `exec_command({cmd:"…"})` 로 감싸 둔다. `prose-check.py` 와 `memory-note.py` 는 훅 입력의 패치에서 편집한 경로를 꺼내고, Codex 는 그 경로를 `*** Update File:` 줄에 적는다.
 
 | 훅 | Codex |
 |---|---|
 | `git-guard.py` | 동작한다 |
-| `commit-checkpoint.py` | 확인하지 않았다 |
-| `stop-check.py` | 기록 형식이 달라 검사하지 못한다 |
-| `prose-check.py` | 입력 형식이 달라 검사하지 못한다 |
-| `memory-note.py` | 입력 형식이 달라 검사하지 못한다 |
-| `agent-guard.py` | 해당 도구가 없다 |
-| `doc-skill-guard.py` | 등록하지 않는다 |
+| `stop-check.py` | 동작한다 |
+| `prose-check.py` | 동작한다 |
+| `memory-note.py` | 동작한다 |
+| `commit-checkpoint.py` | 동작한다 |
+| `agent-guard.py` | Claude 의 `Agent` 도구를 검사하는 훅이다 |
+| `doc-skill-guard.py` | 등록하지 않는다.<br>Claude 의 스킬 호출 기록에 기대는 훅이다 |
 
-훅 테스트는 `python3 claude/hooks/tests/test_stop_check.py` 처럼 파일을 직접 돌린다. Codex 복사 테스트는 `sh tests/codex-sync.test.sh` 다.
+표의 「동작한다」는 실제 Codex 세션을 돌려 확인한 것이다. 테스트만으로는 훅이 불리는지까지 알 수 없다.
+
+Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 부르라고 지시한다. 누락을 자동으로 막지는 않는다.
+
+되돌리기 어려운 명령은 훅이 아니라 권한 규칙으로 막는다. [codex/claude-deny.rules](codex/claude-deny.rules) 가 `~/.codex/rules/` 로 들어가 `git reset`·`git clean`·`rm -rf` 등 열한 가지를 거절하고, 거절할 때 규칙에 적은 이유를 그대로 보여 준다. 인자를 앞에서부터 맞추는 방식이라 깃발이 올 수 있는 자리를 하나씩 적어야 한다. `git push mirror --force` 처럼 원격 이름이 다른 것은 여전히 못 막는다. 못 막는 것은 규칙 파일 끝에 적었다.
+
+저장소마다 정한 규칙은 사본을 만들지 않는다. `config.toml` 에 `project_doc_fallback_filenames = ["CLAUDE.md"]` 를 두면 Codex 가 그 저장소의 `CLAUDE.md` 를 직접 읽는다. 사본을 두면 원본을 고쳐도 사본은 그대로 남는다. 설정이 빠졌는지는 `codex-sync.sh` 가 확인한다.
+
+테스트는 파일을 하나씩 직접 돌린다. 훅은 `claude/hooks/tests/test_*.py` 여섯 개를 `python3 claude/hooks/tests/test_stop_check.py` 처럼 돌리고, Codex 연결은 `sh tests/codex-sync.test.sh`, 권한 규칙은 `sh tests/codex-rules.test.sh` 다.
 
 </details>
 
 ## 공개 파일
 
-규칙 문서와 스킬, 규칙을 검사하는 훅과 테스트, 두 도구로 옮기는 복사 스크립트가 들어 있다.
+규칙 문서와 스킬, 규칙을 검사하는 훅과 테스트, 두 도구가 같은 원본을 보게 하는 스크립트가 들어 있다.
 
 | 파일 | 내용 |
 |---|---|
@@ -72,8 +90,9 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 | [claude/skills/spring-conventions/](claude/skills/spring-conventions/SKILL.md) | Spring·JPA 계층별 코드와 테스트 규칙 |
 | [claude/hooks/](claude/hooks/) | 규칙을 검사하는 훅과 그 테스트 |
 | [claude/settings.json](claude/settings.json) | 훅 등록과 차단 명령 목록. 네 항목만 발췌한다 |
+| [codex/claude-deny.rules](codex/claude-deny.rules) | Codex 가 거절할 명령 목록 |
 | [sync.sh](sync.sh) | 로컬 원본을 이 저장소로 복사한다 |
-| [codex-sync.sh](codex-sync.sh) | 로컬 원본을 Codex 가 읽는 자리로 옮긴다 |
+| [codex-sync.sh](codex-sync.sh) | Codex 가 읽는 자리에서 로컬 원본으로 링크를 건다 |
 
 ## 공개 범위
 
