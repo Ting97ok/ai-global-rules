@@ -76,11 +76,12 @@ def shell_command(raw):
 
     Claude 는 명령 문자열을 그대로 준다. Codex 는 `tools.exec_command({cmd:"…"})` 로 감싸서
     명령이 따옴표 안에 들어간다. 감싼 채로 두면 인용 구간을 지우는 판정이 명령까지 지운다.
+    한 호출에 명령이 여럿 담기므로 모두 꺼내 줄바꿈으로 잇는다.
     """
-    m = CODEX_CMD.search(raw or "")
-    if not m:
+    found = CODEX_CMD.findall(raw or "")
+    if not found:
         return raw or ""
-    return m.group(1).replace('\\"', '"').replace("\\\\", "\\")
+    return "\n".join(c.replace('\\"', '"').replace("\\\\", "\\") for c in found)
 
 
 EXIT_CODE = re.compile(r'"exit_code"\s*:\s*(\d+)')
