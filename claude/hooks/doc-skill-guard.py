@@ -8,7 +8,7 @@ import json
 import os
 import sys
 
-from testrun import written_paths
+from testrun import edited_paths
 
 SKILL = "doc-writing"
 
@@ -51,12 +51,7 @@ def main():
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
         return
-    tool_input = payload.get("tool_input") or {}
-    if payload.get("tool_name") == "Bash":
-        paths = written_paths(tool_input.get("command", ""))
-    else:
-        paths = [tool_input.get("file_path", "")]
-    path = next((p for p in paths if target(p)), "")
+    path = next((p for p in edited_paths(payload) if target(p)), "")
     if not path:
         return
     if called(payload.get("transcript_path", "")):
