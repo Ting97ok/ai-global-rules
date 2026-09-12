@@ -126,6 +126,21 @@ class StopCheckCodex(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("GREEN", result.stdout)
 
+    def test_도구가_끼워_넣은_메시지는_사람_발화로_보지_않는다(self):
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "FAIL: test_x\nFAILED (failures=1)"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("user", '<hook_prompt hook_run_id="stop:5:/x/hooks.json">[stop-check] 이전 지적</hook_prompt>'),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+            self.assertNotIn("상태를 확인한다", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
