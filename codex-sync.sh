@@ -55,12 +55,24 @@ for l in "$SKILLS"/*; do
   [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
 done
 
-# 3. 훅은 사본을 두지 않는다. hooks.json 이 원본 경로를 그대로 가리킨다.
-#    등록만 settings.json 에서 만들고 이벤트 순서는 지금 hooks.json 과 같게 둔다.
+# 3. 훅은 자리를 지키고 파일만 링크로 바꾼다.
+#    hooks.json 의 명령이 바뀌면 Codex 의 훅 신뢰 승인이 풀려 훅이 조용히 멈춘다.
+mkdir -p "$CODEX/hooks"
+find "$CODEX/hooks" -type f -delete 2>/dev/null || true   # 예전 사본을 치운다
+for f in "$SRC"/hooks/*.py; do
+  h=$(basename "$f")
+  case " $NOT_HOOKS " in *" $h "*) continue ;; esac
+  ln -sfn "$f" "$CODEX/hooks/$h"
+done
+# 원본에서 사라진 훅은 끊어진 링크로 남는다
+for l in "$CODEX"/hooks/*; do
+  [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
+done
+
 # 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
 [ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
 
-jq --arg dir "$SRC/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
+jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
   | .hooks as $h
@@ -115,8 +127,6 @@ for f in hooks.json rules; do
 done
 
 cp "$STAGE/codex/hooks.json" "$CODEX/"
-# 예전 방식이 남긴 훅 사본을 치운다. 백업에 들어 있다
-[ -d "$CODEX/hooks" ] && cp -R "$CODEX/hooks" "$B/codex/" && rm -rf "${CODEX:?}/hooks"
 mkdir -p "$CODEX/rules"
 rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
 
