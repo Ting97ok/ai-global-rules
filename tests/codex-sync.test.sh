@@ -108,5 +108,9 @@ else
   cat "$T/out3"
   no "설정을 넣은 뒤 스크립트가 끝나지 않았다"
 fi
+printf '# project_doc_fallback_filenames = ["CLAUDE.md"]\n' > "$T/codex/config.toml"
+CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
+  sh "$SCRIPT" -f > "$T/out4" 2>&1 || true
+grep -q 'project_doc_fallback_filenames' "$T/out4" && ok "주석 처리된 설정은 없는 것으로 본다" || no "주석을 설정으로 셌다"
 
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
