@@ -14,7 +14,7 @@ import json
 import re
 import sys
 
-from testrun import FAILURE, RUNNER
+from testrun import FAILURE, RUNNER, as_text
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -52,11 +52,6 @@ def is_human_turn(row):
     blocks = content_blocks(row)
     return any(b.get("type") == "text" and b.get("text", "").strip() for b in blocks) \
         and not any(b.get("type") == "tool_result" for b in blocks)
-
-
-def result_text(block):
-    c = block.get("content")
-    return c if isinstance(c, str) else json.dumps(c, ensure_ascii=False)
 
 
 def main():
@@ -99,7 +94,7 @@ def main():
                     continue
                 if not RUNNER.search(commands.get(b.get("tool_use_id"), "")):
                     continue
-                last_test_failed = bool(FAILURE.search(result_text(b)))
+                last_test_failed = bool(FAILURE.search(as_text(b.get("content"))))
 
     blocks = re.findall(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", last_text, re.S)
     if not blocks:
