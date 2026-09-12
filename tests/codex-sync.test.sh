@@ -42,6 +42,8 @@ EOF
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 fake_src "$T/claude"
+# Codex 에만 있는 스킬. 복사 뒤에도 그대로 있어야 한다
+mkdir -p "$T/skills/find-skills" && echo "# find-skills" > "$T/skills/find-skills/SKILL.md"
 
 echo "전역 규칙을 AGENTS.md 로 옮긴다"
 if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" sh "$SCRIPT" -f > "$T/out" 2>&1; then
@@ -59,5 +61,11 @@ else
   cat "$T/out"
   no "스크립트가 끝나지 않았다"
 fi
+
+echo "스킬을 옮긴다"
+S="$T/skills"
+[ -f "$S/doc-writing/SKILL.md" ] && ok "doc-writing 을 옮긴다" || no "doc-writing 이 없다"
+[ -d "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
+[ -f "$S/find-skills/SKILL.md" ] && ok "Codex 에만 있는 스킬은 그대로 둔다" || no "Codex 에만 있는 스킬이 사라졌다"
 
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
