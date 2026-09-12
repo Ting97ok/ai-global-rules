@@ -81,4 +81,16 @@ else
   no "hooks.json 이 없다"
 fi
 
+echo "Codex 쪽에서 고친 파일은 덮지 않는다"
+echo "# Codex 쪽에서 고쳤다" >> "$S/doc-writing/SKILL.md"
+if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
+   sh "$SCRIPT" > "$T/out2" 2>&1; then
+  no "-f 없이 덮었다"
+else
+  ok "덮지 않고 멈춘다"
+  grep -q "doc-writing" "$T/out2" && ok "바뀐 파일을 알려 준다" || no "바뀐 파일을 알려 주지 않는다"
+  grep -q "Codex 쪽에서 고쳤다" "$S/doc-writing/SKILL.md" \
+    && ok "Codex 쪽 수정이 그대로 있다" || no "Codex 쪽 수정이 사라졌다"
+fi
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
