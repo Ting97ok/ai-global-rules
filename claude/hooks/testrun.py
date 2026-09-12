@@ -46,3 +46,23 @@ def is_test_run(command):
     skeleton = HEREDOC.sub(" ", command or "")
     skeleton = QUOTED.sub(" ", skeleton)
     return bool(RUNNER.search(skeleton))
+
+
+PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update) File: (.+)$", re.M)
+
+
+def edited_paths(payload):
+    """이번 편집이 건드린 파일 경로.
+
+    Claude 는 tool_input.file_path 로 준다. Codex 는 apply_patch 의 패치 본문으로 줘서
+    `*** Add File:` `*** Update File:` 줄에서 뽑고 cwd 를 앞에 붙인다.
+    """
+    import os
+
+    tool_input = payload.get("tool_input") or {}
+    one = tool_input.get("file_path")
+    if one:
+        return [one]
+    cwd = payload.get("cwd") or ""
+    return [os.path.join(cwd, p.strip()) if cwd else p.strip()
+            for p in PATCH_FILE.findall(tool_input.get("command") or "")]

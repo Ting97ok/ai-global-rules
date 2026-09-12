@@ -16,6 +16,8 @@ import re
 import subprocess
 import sys
 
+from testrun import edited_paths
+
 DASH = " — "
 CAUSE = re.compile(r"기 때문")
 HEAD_MD = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")
@@ -89,9 +91,10 @@ def main():
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
         return
-    path = (payload.get("tool_input") or {}).get("file_path", "")
-    if not target(path) or not os.path.isfile(path):
+    paths = [p for p in edited_paths(payload) if target(p) and os.path.isfile(p)]
+    if not paths:
         return
+    path = paths[0]
     try:
         first = open(path, encoding="utf-8").readline()
     except OSError:
