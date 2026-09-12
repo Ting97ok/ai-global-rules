@@ -29,7 +29,7 @@ NOT_HOOKS="doc-skill-guard.py"
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 STAGE="$T/stage"
-mkdir -p "$STAGE/codex/hooks" "$STAGE/codex/rules"
+mkdir -p "$STAGE/codex/rules"
 
 # 1. 전역 규칙은 링크다. 사본이 없으니 원본과 어긋날 수 없다.
 #    링크는 덮어써도 잃을 것이 없어 비교 대상에서 뺀다.
@@ -51,14 +51,12 @@ for l in "$SKILLS"/*; do
   [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
 done
 
-# 3. 훅은 스크립트를 옮기고 등록은 settings.json 에서 만든다.
-#    이벤트 순서와 명령 꼴을 지금 hooks.json 과 같게 둔다. 훅 신뢰 승인이 그대로 유지된다.
-rsync -a --exclude __pycache__ --exclude tests "$SRC/hooks/" "$STAGE/codex/hooks/"
-for h in $NOT_HOOKS; do rm -f "$STAGE/codex/hooks/$h"; done
+# 3. 훅은 사본을 두지 않는다. hooks.json 이 원본 경로를 그대로 가리킨다.
+#    등록만 settings.json 에서 만들고 이벤트 순서는 지금 hooks.json 과 같게 둔다.
 # 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
 [ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
 
-jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
+jq --arg dir "$SRC/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
   | .hooks as $h
@@ -77,7 +75,7 @@ jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
 sums() {  # sums <codex 뿌리>
   c=$1
   # rules 는 폴더가 아니라 우리가 옮기는 파일 하나만 본다. 손으로 넣은 규칙까지 감시하면 매번 걸린다
-  for f in hooks.json hooks rules/claude-deny.rules; do
+  for f in hooks.json rules/claude-deny.rules; do
     [ -e "$c/$f" ] || continue
     (cd "$c" && find "$f" -type f ! -path '*/__pycache__/*' -exec shasum -a 256 {} +) |
       sed 's|  |  codex/|'
@@ -108,13 +106,11 @@ fi
 # 5. 백업하고 옮긴다. 해시 기록은 모두 끝난 뒤에 쓴다
 B="$CODEX/claude-sync-backup/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$B/codex"
-for f in hooks.json hooks rules; do
+for f in hooks.json rules; do
   [ -e "$CODEX/$f" ] && cp -R "$CODEX/$f" "$B/codex/" || true
 done
 
-mkdir -p "$CODEX/hooks"
 cp "$STAGE/codex/hooks.json" "$CODEX/"
-rsync -a --delete --exclude __pycache__ "$STAGE/codex/hooks/" "$CODEX/hooks/"
 mkdir -p "$CODEX/rules"
 rsync -a "$STAGE/codex/rules/" "$CODEX/rules/"
 
