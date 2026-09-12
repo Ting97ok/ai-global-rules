@@ -15,7 +15,7 @@ import json
 import re
 import sys
 
-from testrun import FAILURE, as_text, is_test_run, shell_command
+from testrun import FAILURE, as_text, is_test_run, run_failed, shell_command
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -101,7 +101,7 @@ def main():
                 commands[p.get("call_id")] = command
             elif t == "custom_tool_call_output":
                 if is_test_run(commands.get(p.get("call_id"), "")):
-                    last_test_failed = bool(FAILURE.search(as_text(p.get("output"))))
+                    last_test_failed = run_failed(p.get("output"))
             elif t == "message" and p.get("role") == "assistant":
                 last_text = as_text(p.get("content"))
             continue

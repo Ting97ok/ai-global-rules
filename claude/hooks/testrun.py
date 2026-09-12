@@ -81,3 +81,19 @@ def shell_command(raw):
     if not m:
         return raw or ""
     return m.group(1).replace('\\"', '"').replace("\\\\", "\\")
+
+
+EXIT_CODE = re.compile(r'"exit_code"\s*:\s*(\d+)')
+
+
+def run_failed(output):
+    """실행 결과가 실패인지 본다.
+
+    Codex 는 출력을 JSON 조각으로 감싸면서 종료 코드를 남긴다. 그 안의 줄바꿈은 두 글자가 되어
+    문구 검사가 낱말 경계를 놓치므로, 종료 코드가 있으면 그것을 먼저 본다.
+    """
+    text = as_text(output)
+    codes = EXIT_CODE.findall(text)
+    if codes:
+        return any(c != "0" for c in codes)
+    return bool(FAILURE.search(text))
