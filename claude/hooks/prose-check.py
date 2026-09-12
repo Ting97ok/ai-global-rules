@@ -36,19 +36,45 @@ def target(path):
     return "/docs/" in p and p.endswith((".md", ".html"))
 
 
-def added_lines(path):
-    """git 추적 파일이면 HEAD 대비 추가된 줄, 아니면 전체."""
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)")
+
+
+def added_numbers(path):
+    """HEAD 대비 추가된 줄의 새 파일 기준 번호. 추적하지 않는 파일이면 None(전체를 본다)."""
     d = os.path.dirname(path) or "."
     tracked = subprocess.run(["git", "ls-files", "--error-unmatch", path], cwd=d,
                              capture_output=True, text=True).returncode == 0
-    if tracked:
-        r = subprocess.run(["git", "diff", "-U0", "HEAD", "--", path], cwd=d,
-                           capture_output=True, text=True)
-        return [l[1:] for l in r.stdout.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    if not tracked:
+        return None
+    r = subprocess.run(["git", "diff", "-U0", "HEAD", "--", path], cwd=d,
+                       capture_output=True, text=True)
+    nums, n = [], 0
+    for l in r.stdout.splitlines():
+        m = HUNK.match(l)
+        if m:
+            n = int(m.group(1))
+        elif l.startswith("+") and not l.startswith("+++"):
+            nums.append(n)
+            n += 1
+    return nums
+
+
+def added_lines(path, is_html):
+    """검사할 줄을 (원문, 코드 영역을 비운 것)으로 낸다.
+
+    코드 영역 판정은 파일 전체를 보고 한다. 추가된 줄만 모아 보면 기존 블록 안의 한 줄을 고쳤을 때
+    그 조각에 여는 표시가 없어 산문으로 검사하게 된다.
+    """
     try:
-        return open(path, encoding="utf-8").read().splitlines()
+        raw = open(path, encoding="utf-8").read().splitlines()
     except OSError:
-        return []
+        return [], []
+    stripped = strip_code(raw, is_html)
+    nums = added_numbers(path)
+    if nums is None:
+        return raw, stripped
+    idx = [n - 1 for n in nums if 0 < n <= len(raw)]
+    return [raw[i] for i in idx], [stripped[i] for i in idx]
 
 
 def strip_code(lines, is_html):
@@ -103,8 +129,7 @@ def main():
         return
 
     is_html = path.endswith(".html")
-    raw = added_lines(path)
-    lines = strip_code(raw, is_html)
+    raw, lines = added_lines(path, is_html)
     blocks, warns = [], []
 
     for i, (r, l) in enumerate(zip(raw, lines), 1):

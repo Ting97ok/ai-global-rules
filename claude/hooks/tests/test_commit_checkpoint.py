@@ -94,6 +94,15 @@ class CommitCheckpoint(unittest.TestCase):
             )
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+    def test_명령이_아예_실행되지_못하면_체크포인트를_내지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            for output in ("zsh: command not found: pytest",
+                           "python3: can't open file 'tests/test_x.py': "
+                           "[Errno 2] No such file or directory"):
+                result = run("python3 tests/test_x.py", output, folder)
+                self.assertEqual("", result.stdout.strip(), output)
+
 
 if __name__ == "__main__":
     unittest.main()

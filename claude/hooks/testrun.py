@@ -14,8 +14,11 @@ RUNNER = re.compile(
     r"|python3?\s+-m\s+(unittest|pytest)"
     r"|python3?\s+\S*test_\w+\.py")
 
+# 실행조차 못 한 것도 실패다. 통과로 세면 「테스트가 통과했다」고 단정하게 된다
 FAILURE = re.compile(
-    r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
+    r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:"
+    r"|command not found|No such file or directory|ModuleNotFoundError"
+    r"|can't open file|is not recognized as", re.IGNORECASE)
 
 
 def as_text(value):

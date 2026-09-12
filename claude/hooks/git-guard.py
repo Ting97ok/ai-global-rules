@@ -212,9 +212,15 @@ def main():
     cwd = payload.get("cwd") or os.getcwd()
     for seg in segments(command):
         toks = tokens(seg)
-        # 앞에 붙은 cd … 나 환경변수는 건너뛰고 실제 명령을 찾는다
+        # 앞에 붙은 cd … 나 환경변수는 건너뛰고 실제 명령을 찾는다.
+        # cd 가 가리키는 곳이 이 명령의 저장소다. 추천 커밋 명령은 늘 `cd {절대경로} &&` 로 시작한다
         while toks and (toks[0] in ("cd", "env", "sudo") or "=" in toks[0] and not toks[0].startswith("-")):
-            toks = toks[2:] if toks[0] == "cd" else toks[1:]
+            if toks[0] == "cd":
+                if len(toks) > 1:
+                    cwd = toks[1]
+                toks = toks[2:]
+            else:
+                toks = toks[1:]
         if not toks:
             continue
         if toks[0] == "git":

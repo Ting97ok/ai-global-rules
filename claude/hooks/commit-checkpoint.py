@@ -4,13 +4,16 @@
 한 사이클(RED → GREEN)이 닫힌 자리가 곧 체크포인트다(~/.claude/CLAUDE.md 「커밋 체크포인트」·「TDD」).
 파일 개수로 재지 않는 이유는 여러 사이클이 한 파일에 쌓일 수 있어서다 — 「방금 초록이 됐다」가 실제 신호다.
 저장소는 명령 앞의 `cd {경로}` 를 따른다. 셸의 현재 폴더가 작업 저장소와 다를 때가 많다.
+
+Codex 는 훅에 종료 코드를 주지 않는다. `tool_response` 가 출력 문자열 하나뿐이고 `transcript_path`
+도 비어 있다. 그래서 이 훅의 실패 판정은 출력 문구에만 기댄다. 종료 코드로만 실패한 실행은 놓친다.
 """
 import json
 import re
 import subprocess
 import sys
 
-from testrun import FAILURE, as_text, is_test_run
+from testrun import as_text, is_test_run, run_failed
 
 
 CD = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(\S+)\s*&&")
@@ -59,7 +62,7 @@ def main():
         return
 
     response = as_text(payload.get("tool_response", ""))
-    if FAILURE.search(response):
+    if run_failed(payload.get("tool_response", "")):
         # 빨강은 체크포인트가 아니다. 다만 컨테이너가 못 뜬 것은 코드 버그처럼 보이므로 원인을 짚어 준다
         if re.search(r"Could not find a valid Docker|docker.*(not running|connection refused)|Testcontainers", response, re.IGNORECASE):
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse",
