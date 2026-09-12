@@ -42,6 +42,8 @@ EOF
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 fake_src "$T/claude"
+# 예전 방식으로 만들어 둔 훅 사본. 옮긴 뒤에는 남아 있으면 안 된다
+mkdir -p "$T/codex/hooks" && echo "print(0)" > "$T/codex/hooks/git-guard.py"
 # Codex 에만 있는 스킬. 복사 뒤에도 그대로 있어야 한다
 mkdir -p "$T/skills/find-skills" && echo "# find-skills" > "$T/skills/find-skills/SKILL.md"
 
