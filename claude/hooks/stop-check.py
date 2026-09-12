@@ -6,6 +6,8 @@
      봐야 할 내용은 답변에 직접 싣는다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 주면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 돌리지 않은 것.
+  3. 이번 턴의 마지막 테스트 실행이 실패했는데 커밋 명령을 주는 것. 한 사이클은 GREEN 까지 간다(「TDD」).
+     한 턴에서 RED → 수정 → GREEN 을 도는 것이 정상이라 마지막 실행만 본다.
 이미 이 훅으로 되돌아온 턴(stop_hook_active)은 다시 막지 않는다. 무한 루프 방지.
 """
 import json
@@ -15,6 +17,15 @@ import sys
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
 STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+RUNNER = re.compile(
+    r"\b(gradlew|gradle|mvnw|mvn|pytest|tox|jest|vitest|rspec"
+    r"|cargo\s+(test|build|check)|go\s+(test|build)|dotnet\s+test"
+    r"|(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|check|lint)"
+    r"|make\s+(test|check|build))\b"
+    r"|python3?\s+-m\s+(unittest|pytest)"
+    r"|python3?\s+\S*test_\w+\.py")
+FAILURE = re.compile(
+    r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
 
 
 def load_transcript(path):
@@ -50,6 +61,11 @@ def is_human_turn(row):
         and not any(b.get("type") == "tool_result" for b in blocks)
 
 
+def result_text(block):
+    c = block.get("content")
+    return c if isinstance(c, str) else json.dumps(c, ensure_ascii=False)
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -69,17 +85,28 @@ def main():
     turn = rows[start + 1:]
 
     ran_commands, last_text = [], ""
+    commands, last_test_failed = {}, False
     for r in turn:
-        if r.get("type") != "assistant":
-            continue
-        texts = []
-        for b in content_blocks(r):
-            if b.get("type") == "tool_use" and b.get("name") == "Bash":
-                ran_commands.append((b.get("input") or {}).get("command", "") or "")
-            elif b.get("type") == "text":
-                texts.append(b.get("text", ""))
-        if texts:
-            last_text = "\n".join(texts)
+        kind = r.get("type")
+        if kind == "assistant":
+            texts = []
+            for b in content_blocks(r):
+                if b.get("type") == "tool_use" and b.get("name") == "Bash":
+                    command = (b.get("input") or {}).get("command", "") or ""
+                    ran_commands.append(command)
+                    commands[b.get("id")] = command
+                elif b.get("type") == "text":
+                    texts.append(b.get("text", ""))
+            if texts:
+                last_text = "\n".join(texts)
+        elif kind == "user":
+            # 테스트 실행의 결과는 종료 코드가 아니라 출력으로 본다 — 파이프를 물리면 0 으로 끝난다
+            for b in content_blocks(r):
+                if b.get("type") != "tool_result":
+                    continue
+                if not RUNNER.search(commands.get(b.get("tool_use_id"), "")):
+                    continue
+                last_test_failed = bool(FAILURE.search(result_text(b)))
 
     blocks = re.findall(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", last_text, re.S)
     if not blocks:
@@ -96,6 +123,9 @@ def main():
         if not any(STATE_CHECK.search(c) for c in ran_commands):
             problems.append("커밋·푸시·PR 명령을 주기 전에 이번 턴에서 상태를 확인한다 (git status / git log / gh pr view). "
                             "확인을 실제로 돌리고, 그 결과에 맞춰 명령을 다시 낸다")
+        if last_test_failed:
+            problems.append("이번 턴의 마지막 테스트 실행이 실패했다. 한 사이클은 GREEN 까지 진행하고 커밋 명령은 그때 낸다. "
+                            "고치지 못했으면 커밋 명령 없이 무엇이 막혔는지 보고한다")
     if problems:
         print(json.dumps({"decision": "block",
                           "reason": "[stop-check] " + " / ".join(problems)}, ensure_ascii=False))
