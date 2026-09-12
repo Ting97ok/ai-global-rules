@@ -54,6 +54,24 @@ class ProseCheck(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stdout or "출력 없음")
             self.assertIn("전각 대시", result.stderr)
 
+    def test_코드_블록_안의_한_줄만_고치면_산문으로_보지_않는다(self):
+        import subprocess as sp
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "docs" / "a.md"
+            doc.parent.mkdir()
+            doc.write_text("# 제목\n\n설명 문장이다.\n\n```python\nx = 1\n```\n", encoding="utf-8")
+            for cmd in (["git", "init", "-q"], ["git", "add", "docs/a.md"],
+                        ["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                         "commit", "-q", "-m", "[Docs] 처음"]):
+                sp.run(cmd, cwd=folder, check=True)
+            doc.write_text("# 제목\n\n설명 문장이다.\n\n```python\n"
+                           "x = 1  # 앞 문장이 있다 — 뒤 문장이 이어진다.\n```\n", encoding="utf-8")
+            result = run({
+                "hook_event_name": "PostToolUse", "tool_name": "Edit", "cwd": folder,
+                "tool_input": {"file_path": str(doc)},
+            })
+            self.assertEqual(0, result.returncode, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
