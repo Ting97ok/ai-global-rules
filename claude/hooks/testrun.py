@@ -16,3 +16,18 @@ RUNNER = re.compile(
 
 FAILURE = re.compile(
     r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
+
+
+def as_text(value):
+    """도구 응답을 읽는 그대로의 문자열로 만든다.
+
+    json.dumps 로 감싸면 줄바꿈이 두 글자 `\\n` 이 돼서 「FAILED」 앞 글자가 n 이 된다.
+    그러면 낱말 경계가 깨져 실패를 놓친다.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return "\n".join(as_text(v) for v in value.values())
+    if isinstance(value, list):
+        return "\n".join(as_text(v) for v in value)
+    return str(value)

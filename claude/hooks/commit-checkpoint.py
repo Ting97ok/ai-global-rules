@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-from testrun import FAILURE, RUNNER
+from testrun import FAILURE, RUNNER, as_text
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
     if not RUNNER.search(command):
         return
 
-    response = json.dumps(payload.get("tool_response", ""), ensure_ascii=False)
+    response = as_text(payload.get("tool_response", ""))
     if FAILURE.search(response):
         # 빨강은 체크포인트가 아니다. 다만 컨테이너가 못 뜬 것은 코드 버그처럼 보이므로 원인을 짚어 준다
         if re.search(r"Could not find a valid Docker|docker.*(not running|connection refused)|Testcontainers", response, re.IGNORECASE):
