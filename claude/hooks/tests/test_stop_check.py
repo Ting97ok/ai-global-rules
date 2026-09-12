@@ -93,6 +93,39 @@ class StopCheck(unittest.TestCase):
             result = run(transcript(rows, folder))
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+def codex_call(call_id, command):
+    return {"type": "response_item", "payload": {
+        "type": "custom_tool_call", "call_id": call_id, "name": "exec",
+        "input": 'text(await tools.exec_command({cmd:"%s"}))' % command}}
+
+
+def codex_result(call_id, output):
+    return {"type": "response_item", "payload": {
+        "type": "custom_tool_call_output", "call_id": call_id,
+        "output": [{"type": "input_text", "text": output}]}}
+
+
+def codex_message(role, text):
+    key = "input_text" if role == "user" else "output_text"
+    return {"type": "response_item", "payload": {
+        "type": "message", "role": role, "content": [{"type": key, "text": text}]}}
+
+
+class StopCheckCodex(unittest.TestCase):
+    def test_Codex_기록에서도_빨간_상태의_커밋_명령을_막는다(self):
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("block", result.stdout)
+            self.assertIn("GREEN", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
