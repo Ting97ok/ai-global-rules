@@ -13,14 +13,20 @@ import sys
 from testrun import FAILURE, as_text, is_test_run
 
 
-CD = re.compile(r"^\s*cd\s+(\S+)\s*&&")
+CD = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(\S+)\s*&&")
+VARIABLE = re.compile(r"[$`]")
 TEST_PATH = re.compile(r"\S*(?:test_\w+\.py|\.test\.sh)")
 
 
 def target_dir(command, fallback):
-    """명령 앞의 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더."""
-    m = CD.match(command or "")
-    return m.group(1) if m else fallback
+    """명령 안의 마지막 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더.
+
+    경로가 변수면 셸을 돌려야 알 수 있다. 그때는 모른다고 답해 엉뚱한 저장소를 세지 않는다.
+    """
+    found = CD.findall(command or "")
+    if not found:
+        return fallback
+    return False if VARIABLE.search(found[-1]) else found[-1]
 
 
 def related(command, root):
@@ -62,6 +68,8 @@ def main():
         return
 
     cwd = target_dir(command, payload.get("cwd") or None)
+    if cwd is False:   # 변수라 어느 저장소인지 모른다
+        return
     status = subprocess.run(["git", "status", "--porcelain"], cwd=cwd,
                             capture_output=True, text=True, timeout=10)
     if status.returncode != 0:
