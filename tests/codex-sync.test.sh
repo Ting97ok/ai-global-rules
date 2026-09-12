@@ -45,17 +45,16 @@ fake_src "$T/claude"
 # Codex 에만 있는 스킬. 복사 뒤에도 그대로 있어야 한다
 mkdir -p "$T/skills/find-skills" && echo "# find-skills" > "$T/skills/find-skills/SKILL.md"
 
-echo "전역 규칙을 AGENTS.md 로 옮긴다"
+echo "전역 규칙을 링크로 둔다"
 if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" sh "$SCRIPT" -f > "$T/out" 2>&1; then
   A="$T/codex/AGENTS.md"
-  if [ -f "$A" ]; then
-    ok "AGENTS.md 를 만든다"
-    grep -q "교차 검증" "$A" && no "Claude 전용 교차 검증 줄이 남았다" || ok "교차 검증 줄을 뺀다"
-    grep -q "doc-skill-guard" "$A" && no "Claude 전용 훅 문장이 남았다" || ok "훅 문장을 뺀다"
-    grep -q "저장소 규칙은 AGENTS.md 에 적는다" "$A" && ok "CLAUDE.md 를 AGENTS.md 로 바꾼다" || no "CLAUDE.md 표기가 안 바뀌었다"
-    grep -q "Claude" "$A" && no "Claude 표기가 남았다" || ok "Claude 를 Codex 로 바꾼다"
+  if [ -L "$A" ]; then
+    ok "AGENTS.md 가 링크다"
+    [ "$(readlink "$A")" = "$T/claude/CLAUDE.md" ] && ok "원본을 가리킨다" || no "원본을 안 가리킨다"
+    printf '나중에 더한 줄\n' >> "$T/claude/CLAUDE.md"
+    grep -q "나중에 더한 줄" "$A" && ok "원본을 고치면 그대로 보인다" || no "원본 수정이 안 보인다"
   else
-    no "AGENTS.md 가 없다"
+    no "AGENTS.md 가 링크가 아니다"
   fi
 else
   cat "$T/out"
