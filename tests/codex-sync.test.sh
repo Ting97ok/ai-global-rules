@@ -93,4 +93,9 @@ else
     && ok "Codex 쪽 수정이 그대로 있다" || no "Codex 쪽 수정이 사라졌다"
 fi
 
+echo "권한 규칙을 옮긴다"
+R="$T/codex/rules/claude-deny.rules"
+[ -f "$R" ] && ok "claude-deny.rules 를 옮긴다" || no "권한 규칙이 없다"
+grep -q 'prefix_rule' "$R" 2>/dev/null && ok "규칙 내용이 그대로다" || no "규칙 내용이 비었다"
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
