@@ -43,7 +43,7 @@ T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 fake_src "$T/claude"
 # 예전 방식으로 만들어 둔 훅 사본. 옮긴 뒤에는 남아 있으면 안 된다
-mkdir -p "$T/codex/hooks" && echo "print(0)" > "$T/codex/hooks/git-guard.py"
+mkdir -p "$T/codex/hooks" && echo "print(0)" > "$T/codex/hooks/old-copy.py"
 # Codex 에만 있는 스킬. 복사 뒤에도 그대로 있어야 한다
 mkdir -p "$T/skills/find-skills" && echo "# find-skills" > "$T/skills/find-skills/SKILL.md"
 
@@ -70,12 +70,16 @@ S="$T/skills"
 [ -e "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
 [ -f "$S/find-skills/SKILL.md" ] && ok "Codex 에만 있는 스킬은 그대로 둔다" || no "Codex 에만 있는 스킬이 사라졌다"
 
-echo "훅은 원본을 그대로 가리킨다"
-[ -d "$T/codex/hooks" ] && no "훅 사본을 만들었다" || ok "훅 사본을 만들지 않는다"
+echo "훅은 자리를 지키고 파일만 링크다"
+H="$T/codex/hooks"
+[ -L "$H/git-guard.py" ] && ok "훅이 링크다" || no "훅이 링크가 아니다"
+[ "$(readlink "$H/git-guard.py")" = "$T/claude/hooks/git-guard.py" ] && ok "원본을 가리킨다" || no "원본을 안 가리킨다"
+[ -f "$H/old-copy.py" ] && no "예전 사본이 남았다" || ok "예전 사본을 치운다"
+[ -e "$H/doc-skill-guard.py" ] && no "doc-skill-guard 를 걸었다" || ok "doc-skill-guard 는 걸지 않는다"
 J="$T/codex/hooks.json"
 if [ -f "$J" ]; then
   ok "hooks.json 을 만든다"
-  grep -q "'$T/claude/hooks/git-guard.py'" "$J" && ok "원본 경로를 가리킨다" || no "원본 경로가 아니다"
+  grep -q "'$H/git-guard.py'" "$J" && ok "hooks.json 경로는 그대로다" || no "hooks.json 경로가 바뀌었다"
   grep -q "doc-skill-guard" "$J" && no "hooks.json 에 doc-skill-guard 가 남았다" || ok "hooks.json 에서 doc-skill-guard 를 뺀다"
 else
   no "hooks.json 이 없다"
