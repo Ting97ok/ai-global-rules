@@ -157,6 +157,22 @@ class StopCheckCodex(unittest.TestCase):
             result = run(transcript(rows, folder))
             self.assertIn("GREEN", result.stdout)
 
+    def test_한_호출에_담긴_명령을_모두_본다(self):
+        many = ('text(await tools.exec_command({cmd:"cat SKILL.md",max_output_tokens:3000}));\n'
+                'text(await tools.exec_command({cmd:"python3 tests/test_x.py",max_output_tokens:2000}));\n'
+                'text(await tools.exec_command({cmd:"git status --short",max_output_tokens:2000}));')
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            {"type": "response_item", "payload": {
+                "type": "custom_tool_call", "call_id": "c1", "name": "exec", "input": many}},
+            codex_result("c1", '{"exit_code":1,"output":"FAIL"}'),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+            self.assertNotIn("상태를 확인한다", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
