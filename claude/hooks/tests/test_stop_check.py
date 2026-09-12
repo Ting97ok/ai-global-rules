@@ -141,6 +141,22 @@ class StopCheckCodex(unittest.TestCase):
             self.assertIn("GREEN", result.stdout)
             self.assertNotIn("상태를 확인한다", result.stdout)
 
+    def test_Codex_출력의_종료_코드로_실패를_읽는다(self):
+        chunk = ('{"chunk_id":"8f72b7","exit_code":1,'
+                 '"output":"F\\n====\\nFAIL: test_x\\n----\\nAssertionError\\n"}')
+        rows = [
+            codex_message("user", "테스트 돌리고 커밋 명령 줘"),
+            codex_call("c1", "python3 tests/test_x.py"),
+            codex_result("c1", "Script completed\nWall time 2.9 seconds\nOutput:\n"),
+            codex_call("c2", "git status --short"),
+            codex_result("c2", " M a.py"),
+            codex_message("assistant", COMMIT_ANSWER),
+        ]
+        rows[2]["payload"]["output"].append({"type": "input_text", "text": chunk})
+        with tempfile.TemporaryDirectory() as folder:
+            result = run(transcript(rows, folder))
+            self.assertIn("GREEN", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
