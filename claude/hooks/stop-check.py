@@ -14,18 +14,11 @@ import json
 import re
 import sys
 
+from testrun import FAILURE, RUNNER
+
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
 STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
-RUNNER = re.compile(
-    r"\b(gradlew|gradle|mvnw|mvn|pytest|tox|jest|vitest|rspec"
-    r"|cargo\s+(test|build|check)|go\s+(test|build)|dotnet\s+test"
-    r"|(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|check|lint)"
-    r"|make\s+(test|check|build))\b"
-    r"|python3?\s+-m\s+(unittest|pytest)"
-    r"|python3?\s+\S*test_\w+\.py")
-FAILURE = re.compile(
-    r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
 
 
 def load_transcript(path):
