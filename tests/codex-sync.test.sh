@@ -98,4 +98,15 @@ R="$T/codex/rules/claude-deny.rules"
 [ -f "$R" ] && ok "claude-deny.rules 를 옮긴다" || no "권한 규칙이 없다"
 grep -q 'prefix_rule' "$R" 2>/dev/null && ok "규칙 내용이 그대로다" || no "규칙 내용이 비었다"
 
+echo "저장소 규칙을 읽는 설정을 확인한다"
+grep -q 'project_doc_fallback_filenames' "$T/out" && ok "설정이 없으면 알려 준다" || no "설정 안내가 없다"
+printf 'project_doc_fallback_filenames = ["CLAUDE.md"]\n' > "$T/codex/config.toml"
+if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
+   sh "$SCRIPT" -f > "$T/out3" 2>&1; then
+  grep -q 'project_doc_fallback_filenames' "$T/out3" && no "설정이 있는데도 알려 준다" || ok "설정이 있으면 잠잠하다"
+else
+  cat "$T/out3"
+  no "설정을 넣은 뒤 스크립트가 끝나지 않았다"
+fi
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
