@@ -37,7 +37,7 @@ class CommitCheckpoint(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             repo_with_change(folder)
             result = run(
-                "python3 ~/.claude/hooks/tests/test_stop_check.py",
+                "python3 tests/test_stop_check.py",
                 "Ran 1 test in 0.03s\n\nOK",
                 folder,
             )
@@ -75,6 +75,14 @@ class CommitCheckpoint(unittest.TestCase):
             )
             self.assertIn("block", result.stdout)
             self.assertIn(there, result.stdout)
+
+    def test_저장소_밖의_테스트_파일이면_체크포인트를_내지_않는다(self):
+        with tempfile.TemporaryDirectory() as here, tempfile.TemporaryDirectory() as away:
+            repo_with_change(here)
+            outside = Path(away) / "test_usage.py"
+            outside.write_text("", encoding="utf-8")
+            result = run(f"python3 {outside}", "Ran 1 test in 0.03s\n\nOK", here)
+            self.assertEqual("", result.stdout.strip(), result.stdout)
 
 
 if __name__ == "__main__":
