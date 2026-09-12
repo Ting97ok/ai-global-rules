@@ -16,6 +16,12 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["git", "push", ["origin", "upstream"], ["--force", "-f", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "강제 푸시는 이력을 덮어쓴다",
+)
+
+prefix_rule(
     pattern = ["git", "reset"],
     decision = "forbidden",
     justification = "되돌리기 어려운 이력 조작이다",
@@ -57,6 +63,12 @@ prefix_rule(
     justification = "폴더를 통째로 지운다",
 )
 
-# 옮기지 못한 것. prefix_rule 은 인자를 앞에서부터 맞춘다
-# - `git push origin --force` 처럼 깃발이 원격 이름 뒤에 오는 꼴.
-# - `rm -f -r` 처럼 `-r` 이 첫 깃발이 아닌 꼴. `rm -r -f` 는 두 번째 인자가 `-r` 이라 막힌다.
+prefix_rule(
+    pattern = ["rm", "-f", ["-r", "-R"]],
+    decision = "forbidden",
+    justification = "폴더를 통째로 지운다",
+)
+
+# 옮기지 못한 것. prefix_rule 은 인자를 앞에서부터 맞춰서, 올 수 있는 자리를 하나씩 적어야 한다.
+# - `git push mirror --force` 처럼 origin·upstream 이 아닌 원격 이름.
+# - `rm -i -f -r` 처럼 깃발이 셋 이상으로 갈린 꼴.
