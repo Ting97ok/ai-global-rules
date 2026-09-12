@@ -31,3 +31,18 @@ def as_text(value):
     if isinstance(value, list):
         return "\n".join(as_text(v) for v in value)
     return str(value)
+
+
+HEREDOC = re.compile(r"<<-?\s*'?\"?(\w+)'?\"?.*?^\1\b", re.S | re.M)
+QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"", re.S)
+
+
+def is_test_run(command):
+    """명령이 실제로 테스트·빌드를 돌리는지 본다.
+
+    인용 부호와 heredoc 안의 글자는 실행이 아니라 텍스트다. 프롬프트나 파일 내용에
+    테스트 명령이 적혀 있어도 실행으로 세지 않는다.
+    """
+    skeleton = HEREDOC.sub(" ", command or "")
+    skeleton = QUOTED.sub(" ", skeleton)
+    return bool(RUNNER.search(skeleton))

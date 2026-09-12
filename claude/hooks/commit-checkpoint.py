@@ -9,7 +9,7 @@ import re
 import subprocess
 import sys
 
-from testrun import FAILURE, RUNNER, as_text
+from testrun import FAILURE, as_text, is_test_run
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
         return
 
     command = payload.get("tool_input", {}).get("command", "")
-    if not RUNNER.search(command):
+    if not is_test_run(command):
         return
 
     response = as_text(payload.get("tool_response", ""))

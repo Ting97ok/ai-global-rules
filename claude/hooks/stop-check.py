@@ -14,7 +14,7 @@ import json
 import re
 import sys
 
-from testrun import FAILURE, RUNNER, as_text
+from testrun import FAILURE, as_text, is_test_run
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -92,7 +92,7 @@ def main():
             for b in content_blocks(r):
                 if b.get("type") != "tool_result":
                     continue
-                if not RUNNER.search(commands.get(b.get("tool_use_id"), "")):
+                if not is_test_run(commands.get(b.get("tool_use_id"), "")):
                     continue
                 last_test_failed = bool(FAILURE.search(as_text(b.get("content"))))
 
