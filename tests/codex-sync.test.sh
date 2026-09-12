@@ -61,10 +61,11 @@ else
   no "스크립트가 끝나지 않았다"
 fi
 
-echo "스킬을 옮긴다"
+echo "스킬을 링크로 둔다"
 S="$T/skills"
-[ -f "$S/doc-writing/SKILL.md" ] && ok "doc-writing 을 옮긴다" || no "doc-writing 이 없다"
-[ -d "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
+[ -L "$S/doc-writing" ] && ok "doc-writing 이 링크다" || no "doc-writing 이 링크가 아니다"
+[ "$(readlink "$S/doc-writing")" = "$T/claude/skills/doc-writing" ] && ok "원본 폴더를 가리킨다" || no "원본 폴더를 안 가리킨다"
+[ -e "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
 [ -f "$S/find-skills/SKILL.md" ] && ok "Codex 에만 있는 스킬은 그대로 둔다" || no "Codex 에만 있는 스킬이 사라졌다"
 
 echo "훅을 옮긴다"
@@ -80,15 +81,20 @@ else
   no "hooks.json 이 없다"
 fi
 
-echo "Codex 쪽에서 고친 파일은 덮지 않는다"
+echo "스킬은 링크라 고치면 원본이 바뀐다"
 echo "# Codex 쪽에서 고쳤다" >> "$S/doc-writing/SKILL.md"
+grep -q "Codex 쪽에서 고쳤다" "$T/claude/skills/doc-writing/SKILL.md" \
+  && ok "원본이 같이 바뀐다" || no "원본이 안 바뀌었다"
+
+echo "사본으로 남는 것은 Codex 쪽 수정을 덮지 않는다"
+echo "# 손으로 고쳤다" >> "$H/git-guard.py"
 if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
    sh "$SCRIPT" > "$T/out2" 2>&1; then
   no "-f 없이 덮었다"
 else
   ok "덮지 않고 멈춘다"
-  grep -q "doc-writing" "$T/out2" && ok "바뀐 파일을 알려 준다" || no "바뀐 파일을 알려 주지 않는다"
-  grep -q "Codex 쪽에서 고쳤다" "$S/doc-writing/SKILL.md" \
+  grep -q "git-guard" "$T/out2" && ok "바뀐 파일을 알려 준다" || no "바뀐 파일을 알려 주지 않는다"
+  grep -q "손으로 고쳤다" "$H/git-guard.py" \
     && ok "Codex 쪽 수정이 그대로 있다" || no "Codex 쪽 수정이 사라졌다"
 fi
 
