@@ -9,14 +9,7 @@ import re
 import subprocess
 import sys
 
-RUNNER = re.compile(
-    r"\b(gradlew|gradle|mvnw|mvn|pytest|tox|jest|vitest|rspec"
-    r"|cargo\s+(test|build|check)|go\s+(test|build)|dotnet\s+test"
-    r"|(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|check|lint)"
-    r"|make\s+(test|check|build))\b")
-
-FAILURE = re.compile(
-    r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
+from testrun import FAILURE, RUNNER, as_text
 
 
 def main():
@@ -29,7 +22,7 @@ def main():
     if not RUNNER.search(command):
         return
 
-    response = json.dumps(payload.get("tool_response", ""), ensure_ascii=False)
+    response = as_text(payload.get("tool_response", ""))
     if FAILURE.search(response):
         # 빨강은 체크포인트가 아니다. 다만 컨테이너가 못 뜬 것은 코드 버그처럼 보이므로 원인을 짚어 준다
         if re.search(r"Could not find a valid Docker|docker.*(not running|connection refused)|Testcontainers", response, re.IGNORECASE):

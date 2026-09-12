@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>AI와 일하며 가장 많이 고친 건 문서였다</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #172033;
+      --muted: #5d6879;
+      --line: #dbe1e8;
+      --accent: #1769aa;
+      --accent-soft: #eaf4fc;
+      --code: #f1f4f7;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10141b;
+        --surface: #171d27;
+        --text: #edf1f7;
+        --muted: #abb5c4;
+        --line: #303948;
+        --accent: #72b7ec;
+        --accent-soft: #172d3e;
+        --code: #242c38;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      font-size: 17px;
+      line-height: 1.75;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    /* 돌아가기 바: 스크롤해도 왼쪽 위에 남는다 */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .topbar-in {
+      width: min(100% - 40px, 760px);
+      height: 52px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+    }
+
+    .back {
+      color: var(--text);
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 6px 12px;
+      margin-left: -12px;
+      border-radius: 8px;
+    }
+
+    .back:hover, .back:focus-visible { background: var(--accent-soft); color: var(--accent); }
+
+    main {
+      width: min(100% - 40px, 760px);
+      margin: 0 auto;
+      padding: 56px 0 40px;
+    }
+
+    .intro {
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1, h2, h3 { letter-spacing: -0.03em; }
+
+    h1 {
+      max-width: 650px;
+      margin: 0 0 18px;
+      font-size: clamp(1.9rem, 5.5vw, 2.9rem);
+      font-weight: 780;
+      line-height: 1.25;
+    }
+
+    h2 {
+      margin: 0 0 20px;
+      font-size: clamp(1.4rem, 4vw, 1.9rem);
+      line-height: 1.3;
+    }
+
+    h3 {
+      margin: 36px 0 12px;
+      font-size: 1.12rem;
+      line-height: 1.4;
+      color: var(--accent);
+    }
+
+    p { margin: 0 0 18px; }
+
+    a { color: var(--accent); text-underline-offset: 0.18em; }
+
+    code {
+      padding: 0.12em 0.32em;
+      border-radius: 4px;
+      background: var(--code);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86em;
+      word-break: break-word;
+    }
+
+    .byline { margin-bottom: 24px; color: var(--muted); font-size: 0.96rem; }
+
+    .lede { margin-bottom: 26px; }
+
+    .summary {
+      margin: 0;
+      padding: 20px 24px 22px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .summary-title { margin: 0 0 8px; color: var(--accent); font-weight: 700; }
+    .summary ul { margin: 0; padding-left: 1.2rem; }
+    .summary li + li { margin-top: 10px; }
+    .summary b { font-weight: 700; }
+
+    section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+
+    strong { color: var(--accent); }
+
+    /* 표: 가로 스크롤은 표 영역 안에서만 */
+    .table-wrap {
+      margin: 22px 0 26px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.93rem; line-height: 1.6; }
+    table.wide { min-width: 600px; }
+    table.wide td:first-child { white-space: nowrap; }
+    section { scroll-margin-top: 60px; }
+
+    th, td {
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: var(--accent-soft); font-weight: 700; white-space: nowrap; }
+    tbody th { background: none; color: var(--muted); font-weight: 600; }
+    tr:last-child td, tr:last-child th { border-bottom: 0; }
+
+    .step-no {
+      display: inline-block;
+      min-width: 1.5em;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* 단계 흐름: 번호와 세로 연결선으로 순서를 보인다 */
+    .steps { list-style: none; margin: 24px 0; padding: 0; counter-reset: step; }
+
+    .steps > li {
+      position: relative;
+      padding: 0 0 26px 52px;
+      counter-increment: step;
+    }
+
+    .steps > li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--surface);
+      font-weight: 700;
+      line-height: 34px;
+      text-align: center;
+    }
+
+    .steps > li::after {
+      content: "";
+      position: absolute;
+      left: 16px;
+      top: 40px;
+      bottom: 6px;
+      width: 2px;
+      background: var(--line);
+    }
+
+    .steps > li:last-child { padding-bottom: 0; }
+    .steps > li:last-child::after { display: none; }
+
+    .step-title { display: block; margin-bottom: 4px; font-weight: 700; line-height: 34px; }
+    .steps p { margin-bottom: 10px; }
+
+    .branch {
+      margin: 14px 0 6px;
+      padding: 14px 18px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .branch-label { display: block; margin-bottom: 4px; color: var(--accent); font-weight: 700; }
+    .branch p:last-child { margin-bottom: 0; }
+
+    .record { color: var(--muted); font-size: 0.94rem; }
+
+    details {
+      margin: 22px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    summary { padding: 15px 18px; color: var(--accent); cursor: pointer; font-weight: 700; }
+
+    details .table-wrap { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
+
+    .limits { margin: 0; padding-left: 1.2rem; }
+    .limits li + li { margin-top: 10px; }
+
+    footer {
+      width: min(100% - 40px, 760px);
+      margin: 0 auto;
+      padding: 28px 0 72px;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    footer p { margin-bottom: 10px; }
+
+    @media (max-width: 600px) {
+      body { font-size: 16px; }
+      .topbar-in, main, footer { width: min(100% - 28px, 760px); }
+      main { padding-top: 40px; }
+      section { padding: 40px 0; }
+      .summary { padding: 18px 18px 20px; }
+      th, td { padding: 11px 12px; }
+      .steps > li { padding-left: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-in">
+      <a class="back" href="https://github.com/Ting97ok/ai-global-rules#readme" data-back>← ai-global-rules README</a>
+    </div>
+  </div>
+
+  <main>
+    <header class="intro">
+      <h1>AI와 일하며 가장 많이 고친 건 문서였다</h1>
+      <p class="byline">최대현 · 백엔드 개발자 · <a href="https://github.com/Ting97ok">github.com/Ting97ok</a></p>
+      <p class="lede">이 글은 <a href="https://github.com/Ting97ok/ai-global-rules">ai-global-rules</a> 저장소의 규칙이 만들어진 과정을 적은 회고다. 나는 실무와 개인 프로젝트에서 Claude Code와 Codex에 설계 문서 초안과 구현을 맡기고 판단과 검토는 직접 해 왔다. 그렇게 일하며 부딪힌 문제와 그때 내린 결정을 순서대로 적었다.</p>
+      <div class="summary">
+        <p class="summary-title">요약</p>
+        <ul>
+          <li><b>원칙</b>: AI가 세운 구현 계획을 온전히 이해한 뒤에 구현을 시작하기로 했다.</li>
+          <li><b>병목</b>: 이 원칙을 지키다 보니 가장 큰 병목은 AI가 쓴 읽기 어려운 구현 계획 문서였다.</li>
+          <li><b>대응</b>: 문서 규칙과 형식을 계속 고쳤고 반드시 지킬 항목은 훅으로 확인하게 했다.</li>
+          <li><b>결과</b>: AI가 쓴 글을 읽는 부담이 줄었다. 설계와 컨벤션 리뷰, 놓칠 수 있는 예외 검토에 시간을 더 쓰면서 틀린 설계를 구현 도중에 바로잡을 수 있었다. 효과를 수치로 재지는 못했다.</li>
+        </ul>
+      </div>
+    </header>
+
+    <section id="principle">
+      <h2>1. 구현보다 이해가 먼저</h2>
+      <p>AI가 구현 계획을 내놓으면 바로 코드부터 짜게 하지 않는다. 내가 그 계획을 온전히 이해한 다음에야 구현으로 넘어간다. 초안은 AI가 쓰더라도 무엇을 받아들이고 구현할지는 결국 내가 판단하고 책임져야 하기 때문이다. 그런데 이 원칙을 지키다 보니 가장 큰 병목은 AI가 쓴 <strong>구현 계획 문서를 읽는 일</strong>이었다.</p>
+      <p>외부 조사에서도 비슷한 모습이 보인다. <a href="https://www.faros.ai/blog/ai-software-engineering">Faros AI</a>가 개발자 1만여 명을 분석한 조사에서, AI 도입률이 높은 팀은 PR 병합이 98% 늘었지만 PR 리뷰 시간도 91% 늘었다고 한다.</p>
+    </section>
+
+    <section id="code-and-docs">
+      <h2>2. 일관성 챙기기: 코드는 모범 사례로, 문서는 규칙으로</h2>
+      <p>코드는 예외 규칙과 모범 코드를 주면 대체로 저장소 구조를 따른다. 설계와 컨벤션에 맞는지 리뷰하고 내 판단과 다를 때만 근거를 맞대 보고 고친다. 문서는 달랐다. 코드는 컴파일러와 테스트가 틀린 곳을 알려 주지만 문서가 읽기 어렵다는 건 읽는 내가 아니면 알 수 없었다.</p>
+      <div class="table-wrap" role="region" aria-label="코드와 문서 비교" tabindex="0">
+        <table>
+          <thead>
+            <tr><th scope="col">구분</th><th scope="col">코드</th><th scope="col">문서</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">모범을 주면</th><td>큰 틀을 따른다.</td><td>겉의 틀만 비슷해진다.</td></tr>
+            <tr><th scope="row">리뷰에서 고치는 것</th><td>설계·컨벤션이 내 판단과 다른 곳</td><td>AI 특유의 문체, 필요 없는 요약, 장황한 설명, 단어 선택</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>규칙으로 하나씩 짚지 않으면 같은 문장을 여러 번 읽어야 뜻을 이해할 수 있었다. 그래서 코드는 모범 사례로, 문서는 규칙으로 일관성을 구현했다.</p>
+    </section>
+
+    <section id="formats">
+      <h2>3. 문서 형식 변천사</h2>
+      <p>내가 끝까지 읽을 수 있는 쪽으로 형식을 바꿀 때마다 손본 곳이 달랐다. 처음에는 읽는 자리를, 그다음에는 화면 배치를, 마지막으로 분량을 바꿨다.</p>
+      <div class="table-wrap" role="region" aria-label="문서 형식 변화" tabindex="0">
+        <table class="wide">
+          <thead>
+            <tr><th scope="col">형식</th><th scope="col">바뀐 것</th><th scope="col">얻은 것</th><th scope="col">남은 문제</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="step-no">1</span>계획 문서</td><td>AI 도구가 권장하는 기본 형식으로 시작했다.</td><td>-</td><td>가독성이 너무 떨어져 읽기를 포기하는 일이 생겼다.</td></tr>
+            <tr><td><span class="step-no">2</span>Markdown</td><td>읽는 자리: 대화창 속 텍스트에서 따로 여는 문서로 옮겼다.</td><td>표와 제목 구조가 생기고 큰 화면에서 볼 수 있었다.</td><td>긴 글의 흐름은 그대로였다.</td></tr>
+            <tr><td><span class="step-no">3</span>HTML</td><td>화면 배치: 비교는 나란히, 순서는 단계로, 보충은 접어서 보여 줬다.</td><td>정보 사이의 관계가 보였다.</td><td>형식이 풀리자 남은 병목이 문장이라는 게 드러났다. 이때부터 문체 규칙을 쓰기 시작했다.</td></tr>
+            <tr><td><span class="step-no">4</span>슬라이드</td><td>분량: 한 장에 한 요점만 담았다.</td><td>AI가 최대한 효율적으로 쓰려 한다고 느꼈다. 가볍게 읽을 수 있게 됐다.</td><td>내용이 함축돼 되묻는 일이 많아졌다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>슬라이드로 바꾸고 나서 AI가 쓴 글을 읽는 스트레스가 줄었다. 생산성도, 일을 이어 갈 체력도 훨씬 나아졌다고 느낀다. 함축된 부분은 되물어서 채운다.</p>
+      <p>작업하면서 보는 개인용 문서는 슬라이드로, 공개용 문서는 블로그 글처럼 스크롤해서 읽는 형태로 쓴다. 나는 슬라이드가 편하지만 처음 보는 사람이 맥락을 따라가기에는 블로그 글 형태가 더 익숙할 거라고 생각했다.</p>
+    </section>
+
+    <section id="skill-and-hooks">
+      <h2>4. 문서 규칙은 스킬로, 강제할 항목은 훅으로</h2>
+      <p>문서 규칙은 문서를 쓸 때만 불리도록 스킬로 옮기고 반드시 지켜야 할 항목은 훅으로 확인하게 했다.</p>
+
+      <h3>스킬</h3>
+      <p><a href="https://code.claude.com/docs/en/memory">Claude Code 문서</a>는 매 세션 불러오는 규칙 파일이 길면 컨텍스트를 더 쓰고 지시를 덜 지킨다고 설명한다. 그래서 문서 작성 규칙은 전역 규칙 파일에서 떼어 내 <code>doc-writing</code> 스킬로 옮기고 대화에도 필요한 핵심 원칙만 전역 규칙에 남겼다.</p>
+      <p>스킬 이름을 부르지 않아도 문서 작업이면 자동으로 불리도록 스킬 설명을 적었다. 문서 파일을 쓰기 전에 스킬을 불렀는지는 훅이 한 번 더 확인한다. Codex에도 전역 규칙과 일부 스킬을 복사 스크립트로 옮긴다. 훅은 동작을 확인한 것, 확인하지 못한 것, 입력·기록 형식 차이로 검사하지 못하는 것이 있어 적용 범위를 README에 따로 적었다. 규칙 전문은 <a href="https://github.com/Ting97ok/ai-global-rules">저장소 README</a>에서 볼 수 있다.</p>
+
+      <h3>훅</h3>
+      <p><a href="https://code.claude.com/docs/en/best-practices">Claude Code 문서</a>는 규칙 파일의 지시는 권고이고 훅은 정해진 조건에서 반드시 실행된다고 설명한다. 그래서 금지하거나 되돌려야 할 동작은 훅과 설정으로 검사한다.</p>
+      <details>
+        <summary>훅과 설정 목록</summary>
+        <div class="table-wrap" role="region" aria-label="훅과 설정" tabindex="0">
+          <table>
+            <thead>
+              <tr><th scope="col">이름</th><th scope="col">확인</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>git-guard.py</code></td><td><code>git add -A</code>, 커밋 형식, 도구 서명, 병합 방식, PR 본문 항목을 확인한다.</td></tr>
+              <tr><td><code>commit-checkpoint.py</code></td><td>테스트·빌드 통과 뒤 커밋하지 않은 변경이 있으면 멈춘다.</td></tr>
+              <tr><td><code>stop-check.py</code></td><td>사용자에게 조회 명령을 시키는 답변, 상태 확인 없이 커밋 명령을 주는 답변, 테스트가 실패한 상태에서 커밋 명령을 주는 답변을 되돌린다.</td></tr>
+              <tr><td><code>prose-check.py</code></td><td>문서의 전각 대시 연결을 막고 이유 표현 과다와 질문형 제목 등을 알린다.</td></tr>
+              <tr><td><code>doc-skill-guard.py</code></td><td>문서 파일을 쓰기 전에 <code>doc-writing</code> 스킬을 불렀는지 확인한다.</td></tr>
+              <tr><td><code>agent-guard.py</code></td><td>서브에이전트 호출에 모델을 지정하면 막는다.</td></tr>
+              <tr><td><code>memory-note.py</code></td><td>메모리보다 전역 규칙이나 저장소 문서에 둘 내용인지 다시 보게 한다.</td></tr>
+              <tr><td><code>settings.json</code></td><td>rebase, force push, reset, clean을 막고 커밋·푸시마다 확인받는다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <section id="design-and-review">
+      <h2>5. AI는 설계와 검토의 파트너</h2>
+      <p>AI에게 구현을 맡기지만 가장 많이 이야기하는 때는 설계하고 검토할 때다. 기능·아키텍처·ERD 설계를 함께 토론하고 구현 중에는 컨벤션과 놓칠 수 있는 예외를 같이 다시 본다. 목표는 개발자 한 명이 6개월에 간신히 출시할 제품을, 같은 6개월 안에 완성도 높은 제품으로 만드는 것이다. 여기서 완성도는 출시 시점의 품질과 유지보수성을 모두 뜻한다.</p>
+
+      <h3>작업 흐름</h3>
+      <ol class="steps">
+        <li>
+          <span class="step-title">설계</span>
+          <p>기능 설계, 아키텍처 설계, ERD 설계처럼 깊은 판단이 필요한 부분에 가장 많은 시간을 쓴다. AI와 토론하며 정하고 이해한 계획만 구현으로 넘긴다.</p>
+          <p class="record"><code>face-gate</code>는 오픈 후 코드를 바꾸면 100여 단지에 다시 배포해야 해서, 구현 전에 범위·기술 스택·프로토콜·기능·오류 응답·ERD·일정 문서를 먼저 썼다. 폐기한 대안에도 다시 검토할 조건을 남겼다.</p>
+        </li>
+        <li>
+          <span class="step-title">구현</span>
+          <p>작업 단위마다 브랜치를 나누고 테스트 하나와 구현 하나를 번갈아 쓰는 사이클마다 코드를 리뷰하고 커밋한다. 놓칠 수 있는 예외가 떠오르면 그 자리에서 AI와 토론한다.</p>
+          <p class="record">공개 기록: <code>hotdeal-commerce</code>의 테스트 커밋 <a href="https://github.com/Ting97ok/hotdeal-commerce/commit/82a62aa"><code>82a62aa</code></a>와 구현 커밋 <a href="https://github.com/Ting97ok/hotdeal-commerce/commit/78982d6"><code>78982d6</code></a></p>
+        </li>
+        <li>
+          <span class="step-title">인수 확인</span>
+          <p>작업 단위가 끝나면 앱을 IntelliJ 디버거로 띄워 실제 경로로 호출하며 확인한다. 디버거를 쓰는 이유는 두 가지다. 첫째, AI가 디버거로 무엇을 하는지 내가 보고 있는 IntelliJ 화면에서 직접 볼 수 있다. 둘째, 코드를 쓰지 않고도 확인할 수 있는 경우가 생각보다 많다.</p>
+          <p class="record"><code>face-gate</code> 실단말 테스트에서는 중단점에서 멈춘 뒤, 코드에 없는 다른 명령을 단말에 보내 봤다.</p>
+          <p class="record">공개 기록: <a href="https://github.com/Ting97ok/hotdeal-commerce/pull/6">hotdeal-commerce PR #6</a> 본문의 「인수 확인」</p>
+          <div class="branch">
+            <span class="branch-label">3-1. 설계가 틀렸다고 판단되면</span>
+            <p>확인하다 보면 기존 설계가 틀렸다는 판단이 들 때가 있다. 시간이 조금이라도 있으면 리팩터링 작업 단위를 추가해서 바꾼다. 사람이 직접 하면 오래 걸렸을 리팩터링도 AI와 함께 하니 놀랄 만큼 빨리 끝났다. AI를 쓰는 가장 큰 장점이 여기 있다고 본다.</p>
+            <p class="record"><code>face-gate</code>에서는 실단말 확인 중 성공 응답이 곧 사진을 인식할 수 있다는 뜻은 아님을 알게 돼, 성공 판정 기준을 등록한 사진 수와 단말이 만든 템플릿 수의 차이로 바꿨다.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-title">전체 검토</span>
+          <p>모든 작업 단위가 끝나면 AI에게 자체 리뷰를 맡기고 나도 빠진 곳이 없는지 전체를 검토한다. 가장 깊게 보는 것은 놓친 예외다.</p>
+        </li>
+        <li>
+          <span class="step-title">교차 확인</span>
+          <p>내 리뷰와 AI 리뷰를 맞대 보고 필요한 지적과 필요 없는 지적을 가려 정리한 뒤 작업을 마무리한다.</p>
+        </li>
+      </ol>
+
+      <h3>출시 시점이 중요할 때</h3>
+      <p>출시 시점이 중요한 사업이라면 설계와 검토에 쓰던 시간을 줄여 기간을 앞당길 수도 있다. 예외 처리에 시간을 쓰다가 출시 시점을 놓치면 사용자 없는 서비스가 될 수도 있다. 무엇에 시간을 쓸지는 속도와 결함 비용을 함께 보고 정한다.</p>
+    </section>
+
+    <section id="open-questions">
+      <h2>6. 아직 답을 내리지 못한 것</h2>
+      <ul class="limits">
+        <li>문서 형식을 바꾼 효과를 아직 수치로 재 보지 못했다. 읽기 편해졌다는 건 작업하며 느낀 변화다. 잴 수 있는 값은 문서 한 편을 승인하기까지 걸린 시간과 되물은 질문 수인데, 둘 다 아직 기록하지 않았다.</li>
+        <li>슬라이드로 바꾸고 나서 되묻는 일이 늘었다. 읽는 부담을 줄이려던 선택이 이해에 필요한 정보까지 줄였는지는 아직 모르겠다.</li>
+        <li>문서 규칙은 문제가 보일 때마다 늘고 있다. 규칙이 많아질수록 AI가 지시를 덜 지키게 되지 않을까 하는 걱정도 있다.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p><a class="back" href="https://github.com/Ting97ok/ai-global-rules#readme" data-back>← ai-global-rules README</a></p>
+  </footer>
+
+  <script>
+    /* GitHub 에서 같은 탭으로 들어왔으면 돌아가기를 브라우저 뒤로 가기로 바꾼다.
+       보던 페이지와 스크롤 위치로 돌아간다. 그 밖의 경우(직접 입력·새 탭)는 README 링크 그대로 둔다 */
+    (function () {
+      var ref = document.referrer;
+      if (history.length < 2 || !/^https:\/\/github\.com\//.test(ref)) return;
+      var label = /^https:\/\/github\.com\/Ting97ok\/ai-global-rules\/?(#.*)?$/.test(ref) ? '← README로 돌아가기' : '← 돌아가기';
+      document.querySelectorAll('[data-back]').forEach(function (a) {
+        a.textContent = label;
+        a.addEventListener('click', function (e) { e.preventDefault(); history.back(); });
+      });
+    })();
+  </script>
+</body>
+</html>

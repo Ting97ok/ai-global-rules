@@ -4,7 +4,7 @@
 set -eu
 cd "$(dirname "$0")"
 SRC="$HOME/.claude"
-SKILLS="spring-conventions"
+SKILLS="spring-conventions doc-writing codex-cross-check"
 
 mkdir -p claude/hooks claude/skills
 cp "$SRC/CLAUDE.md" claude/CLAUDE.md
