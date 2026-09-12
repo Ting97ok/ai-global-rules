@@ -84,6 +84,16 @@ class CommitCheckpoint(unittest.TestCase):
             result = run(f"python3 {outside}", "Ran 1 test in 0.03s\n\nOK", here)
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+    def test_cd_가_변수면_어느_저장소인지_모르니_내지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            result = run(
+                'P=/tmp/x; cd "$P" && python3 tests/test_x.py',
+                "Ran 1 test in 0.03s\n\nOK",
+                folder,
+            )
+            self.assertEqual("", result.stdout.strip(), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
