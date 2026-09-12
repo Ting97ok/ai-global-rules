@@ -1,6 +1,7 @@
 # AI 전역 작업 규칙
 
 Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 실제로 돌아간 공개 기록을 모았다.
+2025년 9월부터 계획을 세워 이 방식으로 일해 왔고, 규칙을 정리해 공개한 것은 2026년 9월이다.
 
 ## [회고 읽기: AI와 일하며 가장 많이 고친 건 문서였다](https://ting97ok.github.io/ai-global-rules/) · 약 8분
 
@@ -12,8 +13,9 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 | 규칙 | 공개 기록 |
 |---|---|
-| 테스트 하나와 구현 하나를 번갈아 커밋한다 | `hotdeal-commerce` [82a62aa](https://github.com/Ting97ok/hotdeal-commerce/commit/82a62aaf5ecbe69c62ccef263f0d05f2326b6aac) → [78982d6](https://github.com/Ting97ok/hotdeal-commerce/commit/78982d6912fff9c3fa9ee1e7f9ad643d5741c8a1) |
+| 테스트 하나와 구현 하나를 번갈아 커밋한다 | 이 저장소 [PR #4](https://github.com/Ting97ok/ai-global-rules/pull/4) 의 커밋 목록<br>`hotdeal-commerce` [82a62aa](https://github.com/Ting97ok/hotdeal-commerce/commit/82a62aaf5ecbe69c62ccef263f0d05f2326b6aac) → [78982d6](https://github.com/Ting97ok/hotdeal-commerce/commit/78982d6912fff9c3fa9ee1e7f9ad643d5741c8a1) |
 | 작업 단위가 끝나면 앱을 띄워 밖에서 호출한다 | `hotdeal-commerce` [PR #6](https://github.com/Ting97ok/hotdeal-commerce/pull/6) 본문의 「인수 확인」 |
+| 교차 검증이 잡은 사실 오류를 댓글로 남긴다 | 이 저장소 [PR #4 댓글](https://github.com/Ting97ok/ai-global-rules/pull/4#issuecomment-5645600619) |
 
 두 커밋은 `confirm` 응답에서 결제 완료(`DONE`)와 결과 미확정(`IN_DOUBT`)을 구분한 변경이다. 테스트가 단언을 먼저 잡고 구현이 `ConfirmPaymentResponse` 에 `status` 필드를 더했다.
 
