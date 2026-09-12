@@ -98,3 +98,24 @@ def run_failed(output):
     if codes:
         return any(c != "0" for c in codes)
     return bool(FAILURE.search(text))
+
+
+REDIRECT = re.compile(r">>?\s*['\"]?([\w./~+$-]+\.(?:md|html))")
+TEE = re.compile(r"\btee\b\s+(?:-a\s+)?['\"]?([\w./~+$-]+\.(?:md|html))")
+SED_I = re.compile(r"\bsed\b[^|;]*?-i[^|;]*?([\w./~+-]+\.(?:md|html))")
+PY_WRITE = re.compile(r"write_text|writelines|\.write\(|open\([^)]*['\"][wa]")
+ANY_DOC = re.compile(r"[\w./~+-]+\.(?:md|html)")
+
+
+def written_paths(command):
+    """셸 명령이 문서를 고치는 것으로 보이면 그 경로를 낸다.
+
+    문서 훅은 Write·Edit 도구에만 걸려서, 셸로 고치면 그대로 빠져나간다.
+    리디렉션·tee·sed -i 는 대상이 명령에 드러나고, 파이썬으로 쓸 때는 경로가 본문 안에 있다.
+    """
+    if not command:
+        return []
+    found = REDIRECT.findall(command) + TEE.findall(command) + SED_I.findall(command)
+    if PY_WRITE.search(command):
+        found += ANY_DOC.findall(command)
+    return found
