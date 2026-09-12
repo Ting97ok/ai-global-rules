@@ -16,6 +16,11 @@ RULES="$(dirname "$0")/codex/claude-deny.rules"   # 이 저장소가 원본이�
 FORCE=0
 [ "${1:-}" = "-f" ] && FORCE=1
 
+# 저장소 규칙은 옮기지 않는다. Codex 가 그 저장소의 CLAUDE.md 를 직접 읽게 두고 설정만 확인한다.
+# 이 키가 없으면 저장소가 정한 것이 Codex 에 하나도 안 간다.
+grep -q 'project_doc_fallback_filenames.*CLAUDE\.md' "$CODEX/config.toml" 2>/dev/null ||
+  echo "codex-sync: config.toml 에 project_doc_fallback_filenames = [\"CLAUDE.md\"] 가 없다. 저장소 CLAUDE.md 를 Codex 가 읽지 않는다"
+
 # Codex 에 옮기지 않는 스킬. Codex 가 자기 자신과 교차 검증하게 된다
 NOT_SKILLS="codex-cross-check"
 # Codex 에 붙이지 않는 훅. Claude 의 Skill 도구 호출을 찾는 훅이라
