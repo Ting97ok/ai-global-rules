@@ -21,6 +21,10 @@ FORCE=0
 grep -q '^[^#]*project_doc_fallback_filenames.*CLAUDE\.md' "$CODEX/config.toml" 2>/dev/null ||
   echo "codex-sync: config.toml 에 project_doc_fallback_filenames = [\"CLAUDE.md\"] 가 없다. 저장소 CLAUDE.md 를 Codex 가 읽지 않는다"
 
+# 전역 규칙이 링크라 Claude 전용 줄을 뺄 수 없다. Codex 쪽에서 그 두 줄을 바로잡는다.
+grep -q '^[^#]*developer_instructions' "$CODEX/config.toml" 2>/dev/null ||
+  echo "codex-sync: config.toml 에 developer_instructions 가 없다. 교차 검증과 doc-skill-guard 는 Claude 전용인데 전역 규칙에 그대로 남아 있다"
+
 # Codex 에 옮기지 않는 스킬. Codex 가 자기 자신과 교차 검증하게 된다
 NOT_SKILLS="codex-cross-check"
 # Codex 에 붙이지 않는 훅. Claude 의 Skill 도구 호출을 찾는 훅이라
