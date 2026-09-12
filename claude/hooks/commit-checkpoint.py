@@ -13,7 +13,9 @@ RUNNER = re.compile(
     r"\b(gradlew|gradle|mvnw|mvn|pytest|tox|jest|vitest|rspec"
     r"|cargo\s+(test|build|check)|go\s+(test|build)|dotnet\s+test"
     r"|(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|check|lint)"
-    r"|make\s+(test|check|build))\b")
+    r"|make\s+(test|check|build))\b"
+    r"|python3?\s+-m\s+(unittest|pytest)"
+    r"|python3?\s+\S*test_\w+\.py")
 
 FAILURE = re.compile(
     r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:", re.IGNORECASE)
