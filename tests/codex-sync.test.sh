@@ -68,4 +68,17 @@ S="$T/skills"
 [ -d "$S/codex-cross-check" ] && no "codex-cross-check 를 옮겼다" || ok "codex-cross-check 는 옮기지 않는다"
 [ -f "$S/find-skills/SKILL.md" ] && ok "Codex 에만 있는 스킬은 그대로 둔다" || no "Codex 에만 있는 스킬이 사라졌다"
 
+echo "훅을 옮긴다"
+H="$T/codex/hooks"
+[ -f "$H/git-guard.py" ] && ok "훅 스크립트를 옮긴다" || no "git-guard.py 가 없다"
+[ -f "$H/doc-skill-guard.py" ] && no "doc-skill-guard.py 를 옮겼다" || ok "doc-skill-guard 는 옮기지 않는다"
+J="$T/codex/hooks.json"
+if [ -f "$J" ]; then
+  ok "hooks.json 을 만든다"
+  grep -q "'$H/git-guard.py'" "$J" && ok "훅 경로를 Codex 자리로 바꾼다" || no "훅 경로가 Codex 자리가 아니다"
+  grep -q "doc-skill-guard" "$J" && no "hooks.json 에 doc-skill-guard 가 남았다" || ok "hooks.json 에서 doc-skill-guard 를 뺀다"
+else
+  no "hooks.json 이 없다"
+fi
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
