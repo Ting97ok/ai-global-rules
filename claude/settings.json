@@ -106,8 +106,7 @@
     "humanize-korean@im-not-ai": true,
     "ponytail@ponytail": true,
     "claude-mem-cowork@thedotmack": true,
-    "codex@openai-codex": true,
-    "eli5@claude-community": true
+    "codex@openai-codex": true
   },
   "extraKnownMarketplaces": {
     "harness-marketplace": {
@@ -138,12 +137,6 @@
       "source": {
         "source": "github",
         "repo": "openai/codex-plugin-cc"
-      }
-    },
-    "claude-community": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/claude-plugins-community"
       }
     }
   }
