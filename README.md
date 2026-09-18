@@ -7,7 +7,7 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 - **원칙**: AI 가 세운 구현 계획을 온전히 이해한 뒤에 구현을 시작한다.
 - **문제**: 계획 문서를 읽는 일이 병목이어서 문서 형식과 작성 규칙을 계속 바꿨다.
-- **한계**: 읽는 부담은 줄었다고 느끼지만 되묻는 일은 늘었고 효과를 수치로 재지는 못했다.
+- **한계**: 읽는 부담은 줄었다고 느끼지만 되묻는 일은 늘었고 효과를 수치로 나타내지는 않았다.
 
 ## 검증 기록
 
@@ -21,7 +21,7 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 리뷰로 방향이 바뀌면 댓글을 먼저 남기고 커밋한다는 규칙은 아직 공개 사례로 제시하지 못했다.
 
-이 저장소 자체의 검사도 공개한다. [훅 테스트](claude/hooks/tests/)가 문서 작성 스킬 호출 누락과 테스트가 실패한 상태의 커밋 명령을 검사하고, [Codex 연결 테스트](tests/codex-sync.test.sh)가 링크와 덮어쓰기 방지를, [권한 규칙 테스트](tests/codex-rules.test.sh)가 Codex 에서 막아야 하는 명령을 검사한다.
+이 저장소 자체의 검사도 공개한다. [훅 테스트](claude/hooks/tests/)가 문서 작성 스킬 호출 누락, [독자 테스트](#자동-검사-범위) 없는 문서 커밋, 테스트가 실패한 상태의 커밋 명령을 검사하고 [Codex 연결 테스트](tests/codex-sync.test.sh)가 링크와 덮어쓰기 방지를, [권한 규칙 테스트](tests/codex-rules.test.sh)가 Codex 에서 막아야 하는 명령을 검사한다.
 
 [이 작업 방식이 만들어진 과정과 남은 고민 읽기](https://ting97ok.github.io/ai-global-rules/)
 
@@ -29,13 +29,15 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 규칙 문서의 지시는 권고다. 훅은 정해진 조건에서 실행된다. 그래서 되돌리기 어려운 동작은 훅으로 검사한다.
 
+캐묻기는 문서를 쓰거나 고치기 전에 독자와 담을 내용을 사용자에게 묻는 절차다. 독자 테스트는 문서 사본만 읽는 Codex 에 질문을 답하게 해 빠진 설명을 찾는 절차다. 둘 다 [doc-writing](claude/skills/doc-writing/SKILL.md) 에 적혀 있다.
+
 | 훅 | 검사하는 것 |
 |---|---|
 | `git-guard.py` | `git add -A`, 커밋 접두사, 도구 서명, 병합 방식, PR 본문 항목 |
-| `commit-checkpoint.py` | 테스트가 통과했는데 커밋하지 않은 변경이 남은 상태 |
-| `stop-check.py` | 조회 명령 시키기, 상태 확인 없는 커밋 명령, 테스트가 실패한 상태의 커밋 명령 |
-| `prose-check.py` | 문서의 전각 대시 문장 연결, 질문형 제목, 제목 속 개수 |
-| `doc-skill-guard.py` | README 와 `docs/` 의 문서를 쓰기 전에 `doc-writing` 스킬을 불렀는지 |
+| `commit-checkpoint.py` | 테스트가 통과했는데 커밋하지 않은 변경이 남은 상태.<br>이번 세션에서 고친 파일만 센다 |
+| `stop-check.py` | 조회 명령 시키기, 상태 확인 없는 커밋 명령, 테스트가 실패한 상태의 커밋 명령, 새로 쓰거나 크게 고친 문서를 독자 테스트 없이 커밋하려는 것 |
+| `prose-check.py` | 문서의 전각 대시 문장 연결, 표 칸 한 조각의 두 문장, 연결어미(지만·는데·면서) 뒤 쉼표, 질문형 제목, 제목 속 개수 |
+| `doc-skill-guard.py` | 문서를 쓰거나 고치기 전에 `doc-writing` 과 캐묻기 스킬을 불렀는지.<br>확장자와 내용으로 문서를 구분하고 셸로 고치는 것도 본다 |
 | `memory-note.py` | 메모리에 둘 내용인지 다시 보게 한다 |
 | `agent-guard.py` | 서브에이전트 호출에 모델을 지정하는 것 |
 
@@ -54,17 +56,17 @@ Claude Code 와 Codex 를 쓰며 정한 개인 작업 규칙과, 그 규칙이 �
 
 `codex-cross-check` 스킬은 링크하지 않는다. Codex 가 자기 자신에게 교차 검증을 요청하게 된다.
 
-전역 규칙이 링크라 Claude 전용 문장을 뺄 수 없다. 교차 검증과 `doc-skill-guard` 두 줄이 그렇다. `config.toml` 의 `developer_instructions` 에 Codex 에는 해당하지 않는다고 적어 바로잡는다.
+전역 규칙이 링크라 Claude 전용 문장을 뺄 수 없다. 교차 검증, `doc-skill-guard`, 독자 테스트 확인 세 줄이 그렇다. `config.toml` 의 `developer_instructions` 에 Codex 에는 해당하지 않는다고 적어 바로잡는다.
 
 `git-guard.py` 는 훅 입력의 셸 명령을 그대로 검사한다. Codex 도 명령을 그대로 넘겨서 처음부터 동작했다. `stop-check.py` 는 대화 기록에서 명령을 꺼내는데, Codex 는 `exec_command({cmd:"…"})` 로 감싸 둔다. `prose-check.py` 와 `memory-note.py` 는 훅 입력의 패치에서 편집한 경로를 꺼내고, Codex 는 그 경로를 `*** Update File:` 줄에 적는다.
 
 | 훅 | Codex |
 |---|---|
 | `git-guard.py` | 동작한다 |
-| `stop-check.py` | 동작한다 |
+| `stop-check.py` | 동작한다.<br>독자 테스트 확인은 Claude 대화 기록만 읽어 Codex 에서는 확인하지 않는다 |
 | `prose-check.py` | 동작한다 |
 | `memory-note.py` | 동작한다 |
-| `commit-checkpoint.py` | 동작한다 |
+| `commit-checkpoint.py` | 동작한다.<br>대화 기록이 없어 세션 전부터 있던 변경도 센다 |
 | `agent-guard.py` | Claude 의 `Agent` 도구를 검사하는 훅이다 |
 | `doc-skill-guard.py` | 등록하지 않는다.<br>Claude 의 스킬 호출 기록에 기대는 훅이다 |
 
@@ -88,6 +90,7 @@ Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 부르라고 지
 |---|---|
 | [claude/CLAUDE.md](claude/CLAUDE.md) | 전역 규칙. 모든 세션에 들어간다 |
 | [claude/skills/doc-writing/](claude/skills/doc-writing/SKILL.md) | 문서 작성 규칙. 문서 작업이면 이름을 부르지 않아도 불린다 |
+| [claude/skills/doc-writing/render-check.js](claude/skills/doc-writing/render-check.js) | 슬라이드 렌더 결함(넘침·잘림·바닥 여백·겹침)을 측정하는 스크립트 |
 | [claude/skills/codex-cross-check/](claude/skills/codex-cross-check/SKILL.md) | Codex 와 교차 검증하는 절차 |
 | [claude/skills/spring-conventions/](claude/skills/spring-conventions/SKILL.md) | Spring·JPA 계층별 코드와 테스트 규칙 |
 | [claude/hooks/](claude/hooks/) | 규칙을 검사하는 훅과 그 테스트 |
@@ -100,6 +103,6 @@ Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 부르라고 지
 
 - 문서 초안은 AI 가 쓰고 내가 검토한다. 채택한 설계와 변경 내용은 내가 책임지고 커밋과 푸시도 직접 한다.
 - 설정은 `permissions`, `hooks`, `enabledPlugins`, `extraKnownMarketplaces` 네 항목만 발췌한다. 인증 정보와 대화 기록, 메모리는 공개하지 않는다.
-- 외부에서 가져온 스킬은 이 저장소에 올리지 않고 출처로 연결한다. [mattpocock/skills](https://github.com/mattpocock/skills), IntelliJ 의 `ij-debugger`.
+- 외부에서 가져온 스킬은 이 저장소에 올리지 않고 출처로 연결한다. [mattpocock/skills](https://github.com/mattpocock/skills), IntelliJ 의 `ij-debugger`. `grill-me` 와 `grill-with-docs` 는 mattpocock/skills 에서 가져와 한국어 규칙을 더했다. 더한 규칙은 [doc-writing](claude/skills/doc-writing/SKILL.md) 「쓰기 전에 캐묻는다」에 있다.
 - 회사 업무용 규칙과 사내 저장소 내용은 넣지 않는다.
-- 작업 시간이나 결함이 얼마나 줄었는지는 측정하지 않았다. 수치로 제시하지 않는다.
+- 작업 시간이나 결함이 얼마나 줄었는지는 측정하지 않았다. 효과를 수치로 제시하지 않는다. 회고에 적은 수치는 독자 테스트 한 번의 비용과 검토 결과다.

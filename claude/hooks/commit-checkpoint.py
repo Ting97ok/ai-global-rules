@@ -9,14 +9,14 @@ Codex 는 훅에 종료 코드를 주지 않는다. `tool_response` 가 출력 �
 도 비어 있다. 그래서 이 훅의 실패 판정은 출력 문구에만 기댄다. 종료 코드로만 실패한 실행은 놓친다.
 """
 import json
+import os
 import re
 import subprocess
 import sys
 
-from testrun import as_text, is_test_run, run_failed
+from testrun import as_text, called_paths, cd_targets, is_test_run, load_rows, run_failed
 
 
-CD = re.compile(r"(?:^|&&|\|\||;)\s*cd\s+(\S+)\s*&&")
 VARIABLE = re.compile(r"[$`]")
 TEST_PATH = re.compile(r"\S*(?:test_\w+\.py|\.test\.sh)")
 
@@ -24,12 +24,13 @@ TEST_PATH = re.compile(r"\S*(?:test_\w+\.py|\.test\.sh)")
 def target_dir(command, fallback):
     """명령 안의 마지막 `cd {경로}` 가 가리키는 폴더. 없으면 셸의 현재 폴더.
 
-    경로가 변수면 셸을 돌려야 알 수 있다. 그때는 모른다고 답해 엉뚱한 저장소를 세지 않는다.
+    같은 명령에서 대입하지 않은 변수는 셸을 돌려야 알 수 있다. 그때는 모른다고 답해 엉뚱한 저장소를 세지 않는다.
     """
-    found = CD.findall(command or "")
+    found = cd_targets(command)
     if not found:
         return fallback
-    return False if VARIABLE.search(found[-1]) else found[-1]
+    target = found[-1][1]
+    return False if VARIABLE.search(target) else target
 
 
 def related(command, root):
@@ -38,8 +39,6 @@ def related(command, root):
     셸의 현재 폴더가 작업 저장소와 다를 때가 있다. 그때 남의 저장소의 미커밋 변경을
     세지 않으려고 본다. 경로를 적지 않는 명령(`./gradlew test`)은 현재 폴더에서 도니 통과다.
     """
-    import os
-
     paths = TEST_PATH.findall(command or "")
     if not paths:
         return True
@@ -49,6 +48,27 @@ def related(command, root):
         if full == root or full.startswith(root + os.sep):
             return True
     return False
+
+
+def changed_files(porcelain):
+    """`git status --porcelain -z` 출력에서 바뀐 경로를 낸다. 이름을 바꾼 것은 새 경로만 센다."""
+    files, old_name_next = [], False
+    for entry in porcelain.split("\0"):
+        if old_name_next:
+            old_name_next = False
+        elif len(entry) > 3:
+            files.append(entry[3:])
+            old_name_next = entry[0] in "RC"
+    return files
+
+
+def touched(root, rel, edits):
+    """이번 세션에서 고친 파일인지 본다. 추적하지 않는 폴더는 그 안의 파일을 고쳤는지 본다.
+
+    세션을 시작하기 전부터 있던 변경으로 체크포인트를 내지 않기 위해서다.
+    """
+    full = os.path.realpath(os.path.join(root, rel))
+    return full in edits or (rel.endswith("/") and any(e.startswith(full + os.sep) for e in edits))
 
 
 def main():
@@ -73,11 +93,11 @@ def main():
     cwd = target_dir(command, payload.get("cwd") or None)
     if cwd is False:   # 변수라 어느 저장소인지 모른다
         return
-    status = subprocess.run(["git", "status", "--porcelain"], cwd=cwd,
+    status = subprocess.run(["git", "status", "--porcelain", "-z"], cwd=cwd,
                             capture_output=True, text=True, timeout=10)
     if status.returncode != 0:
         return
-    changed = [line for line in status.stdout.splitlines() if line.strip()]
+    changed = changed_files(status.stdout)
     if not changed:
         return
 
@@ -85,6 +105,12 @@ def main():
                           capture_output=True, text=True, timeout=10).stdout.strip()
     if not root or not related(command, root):
         return
+    transcript = payload.get("transcript_path") or ""
+    if os.path.isfile(transcript):
+        edits = {p for row in load_rows(transcript) for p in called_paths(row)}
+        changed = [rel for rel in changed if touched(root, rel, edits)]
+        if not changed:
+            return
 
     print(json.dumps({
         "decision": "block",
