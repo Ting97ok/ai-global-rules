@@ -106,7 +106,9 @@
     "humanize-korean@im-not-ai": true,
     "ponytail@ponytail": true,
     "claude-mem-cowork@thedotmack": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "diagram-design@diagram-design": true,
+    "typesafe@typesafe-ai": true
   },
   "extraKnownMarketplaces": {
     "harness-marketplace": {
@@ -137,6 +139,18 @@
       "source": {
         "source": "github",
         "repo": "openai/codex-plugin-cc"
+      }
+    },
+    "diagram-design": {
+      "source": {
+        "source": "github",
+        "repo": "cathrynlavery/diagram-design"
+      }
+    },
+    "typesafe-ai": {
+      "source": {
+        "source": "github",
+        "repo": "typesafe-ai/skills"
       }
     }
   }
