@@ -6,6 +6,7 @@
      제외한다) 2번의 커밋·푸시·PR 명령이 없는 블록. 확인해야 할 내용은 답변에 직접 포함한다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 제시하면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 실행하지 않은 것.
+     `git -C 경로 status` 처럼 경로를 지정한 상태 확인도 포함한다.
   3. 이번 턴의 마지막 테스트 실행이 실패했는데 2번의 커밋·푸시·PR 명령을 제시하는 것. 한 사이클은 GREEN 까지 진행한다(「TDD」).
      내용이 없는 빈 커밋(--allow-empty)은 제외한다. 브랜치를 열어 드래프트 PR 을 생성하는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 진행하는 것이 정상이라 마지막 실행만 확인한다.
@@ -18,7 +19,12 @@
      Codex 교차 검증은 PR 댓글로 게시하지 않으므로 교차 검증만으로는 PR 댓글 판단을 요구하지 않는다.
   6. 커밋 명령의 `검토:` 줄에 PR 댓글 주소가 없는 것. 커밋은 사용자가 실행하므로 git-guard 9번이 실행되지 않는다.
   7. 요청 뒤에 PR 댓글을 게시했는데 커밋 명령 뒤에 `git push` 블록이 없는 것.
-  5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다. 요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다.
+  5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다.
+  8. 마지막 요청 뒤에 교차 검증의 Codex 작업(codex-companion task)을 crosscheck.py run 으로 감싸지 않고 호출한 것.
+     직접 호출하면 모델과 사용량이 기록되지 않는다. --cwd 가 reader-test-* 인 독자 테스트는 제외한다.
+  9. 마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목(--item)이 마지막 답변에 없는 것.
+  8·9 는 codex-cross-check 「진행」·「보고」다. 교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 마지막 요청이다.
+  요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다. 판정은 testrun human_message 가 한다.
 이미 이 훅으로 반려된 턴(stop_hook_active)은 다시 반려하지 않는다. 무한 루프 방지.
 """
 import json

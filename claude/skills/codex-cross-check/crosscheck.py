@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""교차 검증에서 항목마다 주고받은 요지를 기록하고 보고용 요약을 출력한다. codex-cross-check 「보고」에 쓴다.
+"""교차 검증의 Codex 호출과 항목별 요지를 기록하고 보고용 요약을 출력한다. codex-cross-check 「진행」·「보고」에서 사용한다.
 
-기록은 ~/.claude/crosscheck/{Claude 세션 ID}.jsonl 에 한 줄씩 쌓는다. 대화 원문은 기록하지 않는다.
+  run --session ID -- 명령…
+      Codex 호출을 실행한다. 출력은 캡처하지 않고 종료 코드를 그대로 반환한다.
+      호출이 끝나면 호출을 시작한 뒤 수정된 Codex 기록 파일에서 세션 ID·모델·추론 수준·사용량을 읽어 기록한다.
+  note --session ID --item 제목 --round 차수 [--claude --codex --split --decision --reason]
+      항목의 한 차수에서 Claude 요지·Codex 요지·갈린 곳·결정·근거를 기록한다.
+  report --session ID
+      마지막 report 뒤에 기록한 항목을 항목별로 출력하고 마지막 줄에 마지막 호출의 usage.py 출력을 붙인다.
+
+기록은 ~/.claude/crosscheck/{Claude 세션 ID}.jsonl 에 한 줄씩 추가한다. 대화 원문은 기록하지 않는다.
 """
 import argparse
 import json
