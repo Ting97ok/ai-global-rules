@@ -92,6 +92,7 @@ CODEX_TASK = re.compile(r"codex-companion\S*\s+task\b")
 READER_DIR = re.compile(r"reader-test-([\w.-]+?)(?:\.(?:md|html))?(?=[/\s'\"]|$)")
 WRAPPED = re.compile(r"\bcrosscheck\.py\s+run\b")
 READER_CWD = re.compile(r"--cwd[=\s]+['\"]?\S*reader-test-")
+NOTE = re.compile(r"\bcrosscheck\.py\s+note\b")
 
 
 def document_name(path):
@@ -270,6 +271,22 @@ def direct_codex_tasks(rows):
             if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
 
 
+def noted_items(rows):
+    """마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목."""
+    requests = [i for i, r in enumerate(rows) if is_request(r)]
+    since = rows[requests[-1] + 1:] if requests else rows
+    items = []
+    for command in map(without_heredoc_bodies, commands_in(since)):
+        if not NOTE.search(command):
+            continue
+        try:
+            words = shlex.split(command)
+        except ValueError:
+            words = command.split()
+        items += [words[i + 1] for i, word in enumerate(words[:-1]) if word == "--item"]
+    return items
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -330,6 +347,10 @@ def main():
     if direct_codex_tasks(rows):
         problems.append("교차 검증의 Codex 작업은 `crosscheck.py run --session {Claude 세션 ID} -- …` 로 감싸 호출한다. "
                         "직접 호출하면 모델과 사용량이 기록되지 않는다. 독자 테스트(--cwd 가 reader-test-*)는 대상이 아니다")
+    missing = [item for item in noted_items(rows) if item not in last_text]
+    if missing:
+        problems.append("교차 검증에서 기록한 항목을 답변에 보고하지 않았다: " + ", ".join(missing) +
+                        ". `crosscheck.py report --session {Claude 세션 ID}` 출력으로 항목마다 요약을 싣는다")
     for b in blocks:
         first = b.strip().split("\n", 1)[0]
         # 앞의 cd … && 는 건너뛰고 실제 명령을 본다
