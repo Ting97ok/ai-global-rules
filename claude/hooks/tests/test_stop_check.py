@@ -355,6 +355,15 @@ class StopCheck(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("GREEN", result.stdout)
 
+    def test_git_C_로_경로를_준_상태_확인도_센다(self):
+        for name, check in {"경로": "git -C /repo status --short",
+                            "따옴표로 감싼 경로": 'git -C "/work space/repo" log --oneline -2'}.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("커밋 명령 줘"), bash_call("s1", check), bash_result("s1", " M a.java"),
+                        answer(COMMIT_ANSWER)]
+                stdout = run(transcript(rows, folder)).stdout
+                self.assertEqual("", stdout.strip(), stdout)
+
     def test_빈_커밋_명령은_빨간_상태에서도_막지_않는다(self):
         rows = [
             human("브랜치를 시작해"),
