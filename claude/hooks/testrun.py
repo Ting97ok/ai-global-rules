@@ -198,6 +198,14 @@ def load_rows(path):
     return rows
 
 
+def content_blocks(row):
+    """Claude 기록 한 줄의 content 블록 목록. 글이 문자열로 들어온 줄은 글 블록 하나로 만든다."""
+    content = (row.get("message") or {}).get("content")
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    return content if isinstance(content, list) else []
+
+
 # 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
 NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
                "Stop hook feedback", "Base directory for this skill")

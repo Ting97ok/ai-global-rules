@@ -28,8 +28,8 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, NOT_REQUEST, as_text, called_paths, cd_targets, is_document, is_test_run, load_rows,
-                     run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, NOT_REQUEST, as_text, called_paths, cd_targets, content_blocks, is_document, is_test_run,
+                     load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -153,14 +153,6 @@ def reader_tests(rows):
             for name in set(READER_DIR.findall(command)):
                 found.setdefault(name, []).append(i)
     return found
-
-
-def content_blocks(row):
-    msg = row.get("message") or {}
-    c = msg.get("content")
-    if isinstance(c, str):
-        return [{"type": "text", "text": c}]
-    return c if isinstance(c, list) else []
 
 
 def codex_payload(row):

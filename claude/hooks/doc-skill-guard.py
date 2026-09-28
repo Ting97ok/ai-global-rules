@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-from testrun import called_paths, edited_paths, failed_calls, human_message, is_document, load_rows, said
+from testrun import called_paths, content_blocks, edited_paths, failed_calls, human_message, is_document, load_rows, said
 
 SKILL = "doc-writing"
 GRILL = {"grill-me", "grill-with-docs"}
@@ -21,7 +21,7 @@ def skills(row):
     """그 줄에서 부른 스킬 이름."""
     if row.get("type") != "assistant":
         return set()
-    return {(b.get("input") or {}).get("skill") for b in (row.get("message") or {}).get("content") or []
+    return {(b.get("input") or {}).get("skill") for b in content_blocks(row)
             if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") == "Skill"}
 
 
