@@ -5,6 +5,8 @@
 """
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 # note 가 받는 요지와 report 가 붙이는 이름
@@ -20,6 +22,11 @@ def write(session, row):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def run(args):
+    # 출력을 캡처하지 않는다. Codex 의 진행 줄이 호출한 쪽 화면에 바로 나와야 한다
+    sys.exit(subprocess.run(args.command).returncode)
 
 
 def note(args):
@@ -47,7 +54,11 @@ def report(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    commands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="action", required=True)
+    p = commands.add_parser("run")
+    p.add_argument("--session", required=True)
+    p.add_argument("command", nargs="+")
+    p.set_defaults(func=run)
     p = commands.add_parser("note")
     p.add_argument("--session", required=True)
     p.add_argument("--item", required=True)
