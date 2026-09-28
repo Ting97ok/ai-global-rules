@@ -5,11 +5,12 @@ Codex 는 대화마다 기록 파일(rollout)에 `rate_limits` 를 남긴다. 5�
 인자로 기록 파일을 주면 그 파일을, 안 주면 가장 최근 파일을 본다.
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
-SESSIONS = Path.home() / ".codex/sessions"
+SESSIONS = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")) / "sessions"
 
 
 def newest():
@@ -72,8 +73,15 @@ def line(window):
 
 
 def main():
-    path = Path(sys.argv[1]) if len(sys.argv) > 1 else newest()
-    if not path or not Path(path).exists():
+    arg = sys.argv[1] if len(sys.argv) > 1 else None
+    # 인자가 파일이 아니면 Codex 세션 ID 다. 기록 파일 이름 끝에 세션 ID 가 붙는다
+    if arg is None:
+        path = newest()
+    elif Path(arg).is_file():
+        path = Path(arg)
+    else:
+        path = next(SESSIONS.rglob(f"rollout-*-{arg}.jsonl"), None)
+    if not path:
         print("Codex 기록을 찾지 못했다")
         return
     context = last_context(path)
