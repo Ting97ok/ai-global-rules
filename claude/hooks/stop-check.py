@@ -90,6 +90,8 @@ def last_edits(rows):
 
 CODEX_TASK = re.compile(r"codex-companion\S*\s+task\b")
 READER_DIR = re.compile(r"reader-test-([\w.-]+?)(?:\.(?:md|html))?(?=[/\s'\"]|$)")
+WRAPPED = re.compile(r"\bcrosscheck\.py\s+run\b")
+READER_CWD = re.compile(r"--cwd[=\s]+['\"]?\S*reader-test-")
 
 
 def document_name(path):
@@ -257,6 +259,17 @@ def comment_problems(rows, last_text, blocks):
     return problems
 
 
+def direct_codex_tasks(rows):
+    """마지막 요청 뒤에 crosscheck.py run 으로 감싸지 않고 실행한 Codex 작업. 독자 테스트는 대상이 아니다.
+
+    교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 이번 턴이 아니라 마지막 요청이다.
+    """
+    requests = [i for i, r in enumerate(rows) if is_request(r)]
+    since = rows[requests[-1] + 1:] if requests else rows
+    return [c for c in map(without_heredoc_bodies, commands_in(since))
+            if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -314,6 +327,9 @@ def main():
 
     blocks = BASH_BLOCK.findall(last_text)
     problems = comment_problems(rows, last_text, blocks)
+    if direct_codex_tasks(rows):
+        problems.append("교차 검증의 Codex 작업은 `crosscheck.py run --session {Claude 세션 ID} -- …` 로 감싸 호출한다. "
+                        "직접 호출하면 모델과 사용량이 기록되지 않는다. 독자 테스트(--cwd 가 reader-test-*)는 대상이 아니다")
     for b in blocks:
         first = b.strip().split("\n", 1)[0]
         # 앞의 cd … && 는 건너뛰고 실제 명령을 본다
