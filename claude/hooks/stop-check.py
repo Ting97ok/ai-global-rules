@@ -22,7 +22,8 @@
   5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다.
   8. 마지막 요청 뒤에 교차 검증의 Codex 작업(codex-companion task)을 crosscheck.py run 으로 감싸지 않고 호출한 것.
      직접 호출하면 모델과 사용량이 기록되지 않는다. --cwd 가 reader-test-* 인 독자 테스트는 제외한다.
-  9. 마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목(--item)이 마지막 답변에 없는 것.
+  9. 마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목(--item)이 그 note 뒤에 나간 답변 어디에도 없는 것.
+     보고를 마친 뒤 사용자가 `!` 명령을 실행해도 같은 제목을 다시 요구하지 않는다.
   8·9 는 codex-cross-check 「진행」·「보고」다. 교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 마지막 요청이다.
   요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다. 판정은 testrun human_message 가 한다.
 이미 이 훅으로 반려된 턴(stop_hook_active)은 다시 반려하지 않는다. 무한 루프 방지.
