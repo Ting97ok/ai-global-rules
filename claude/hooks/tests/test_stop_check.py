@@ -368,6 +368,135 @@ class StopCheck(unittest.TestCase):
             result = run(transcript(rows, folder))
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+
+def cross_check_call(call_id):
+    return bash_call(call_id, "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs task "
+                              "--fresh --cwd /repo --prompt-file /private/tmp/s/xcheck-prompt.md")
+
+
+def notification(tool_id):
+    return {"type": "user", "message": {"role": "user", "content":
+            f"<task-notification>\n<tool-use-id>{tool_id}</tool-use-id>\n<status>completed</status>\n"
+            "(exit code 0)\n</task-notification>"}}
+
+
+def user_command(command):
+    return {"type": "user", "message": {"role": "user", "content": f"<bash-input>{command}</bash-input>"}}
+
+
+REVIEW_COMMIT = ('```bash\ncd /repo && git add a.java && git commit -m "[Feat] 바꾼다" '
+                 '-m "검토: 지적 → 바뀐 것 (https://github.com/o/r/pull/13#issuecomment-1)"\n```\n')
+
+
+# ~/.claude/CLAUDE.md 「브랜치·PR 흐름」 — 반박으로 방향이 바뀌거나 교차 검증에서 초안이 틀리면 댓글이 먼저다
+class CommentDecision(unittest.TestCase):
+    def check(self, rows):
+        with tempfile.TemporaryDirectory() as folder:
+            return run(transcript(rows, folder)).stdout
+
+    # Codex 교차 검증은 PR 댓글로 남기지 않는다. 교차 검증만으로는 댓글 판단을 묻지 않는다
+    def test_교차_검증만으로는_댓글_판단을_묻지_않는다(self):
+        stdout = self.check([
+            human("중첩이 꼭 필요해?"),
+            cross_check_call("c1"),
+            bash_result("c1", "Command running in background with ID: b1."),
+            notification("c1"),
+            answer("필요합니다. 안쪽 finally 가 정리를 보장합니다."),
+        ])
+        self.assertEqual("", stdout.strip(), stdout)
+
+    def test_커밋_명령을_낸_답_뒤의_요청에_댓글_판단_없이_답하면_막는다(self):
+        stdout = self.check([
+            human("진행해"),
+            answer(COMMIT_ANSWER),
+            human("중첩이 꼭 필요해?"),
+            answer("필요합니다. 안쪽 finally 가 정리를 보장합니다."),
+        ])
+        self.assertIn("block", stdout)
+        self.assertIn("반박", stdout)
+
+    def test_커밋_명령을_낸_답_뒤의_요청에_댓글_판단을_적으면_통과한다(self):
+        stdout = self.check([
+            human("진행해"),
+            answer(COMMIT_ANSWER),
+            human("중첩이 꼭 필요해?"),
+            answer("필요합니다. 결정이 그대로라 댓글 대상이 아닙니다."),
+        ])
+        self.assertEqual("", stdout.strip(), stdout)
+
+    def test_사용자가_명령을_돌린_뒤의_답은_댓글_판단을_묻지_않는다(self):
+        stdout = self.check([
+            human("진행해"),
+            answer(COMMIT_ANSWER),
+            human("중첩이 꼭 필요해?"),
+            answer("필요합니다. 결정이 그대로라 댓글 대상이 아닙니다."),
+            user_command('cd /repo && git commit -m "[Test] 실패 테스트 하나"'),
+            bash_call("s1", "cd /repo && git status --short"),
+            bash_result("s1", " M a.java"),
+            answer(COMMIT_ANSWER),
+        ])
+        self.assertEqual("", stdout.strip(), stdout)
+
+    def test_heredoc_본문에_적힌_댓글_명령은_댓글을_올린_것으로_세지_않는다(self):
+        stdout = self.check([
+            human("진행해"),
+            answer(COMMIT_ANSWER),
+            human("중첩이 꼭 필요해?"),
+            bash_call("p1", "python3 - <<'EOF'\ncmd = 'cd /repo && gh pr comment 13 --body x'\nEOF"),
+            bash_result("p1", "exit 2"),
+            answer("필요합니다. 안쪽 finally 가 정리를 보장합니다."),
+        ])
+        self.assertIn("block", stdout)
+        self.assertIn("반박", stdout)
+
+    def test_검토_줄에_댓글_주소가_없는_커밋_명령을_막는다(self):
+        stdout = self.check([
+            human("반영해"),
+            bash_call("s1", "cd /repo && git status --short"),
+            bash_result("s1", " M a.java"),
+            answer('```bash\ncd /repo && git add a.java && git commit -m "[Feat] 바꾼다" -m "검토: 지적 → 바뀐 것"\n```\n'),
+        ])
+        self.assertIn("block", stdout)
+        self.assertIn("댓글 주소", stdout)
+
+    def test_댓글을_올린_뒤_커밋_명령만_주고_푸시가_없으면_막는다(self):
+        stdout = self.check([
+            human("반영해"),
+            bash_call("g1", "cd /repo && gh pr comment 13 --body-file /private/tmp/s/comment.md"),
+            bash_result("g1", "https://github.com/o/r/pull/13#issuecomment-1"),
+            bash_call("s1", "cd /repo && git status --short"),
+            bash_result("s1", " M a.java"),
+            answer(REVIEW_COMMIT),
+        ])
+        self.assertIn("block", stdout)
+        self.assertIn("git push", stdout)
+
+    def test_댓글을_반영한_커밋을_사용자가_돌린_뒤에는_푸시_블록을_묻지_않는다(self):
+        stdout = self.check([
+            human("반영해"),
+            bash_call("g1", "cd /repo && gh pr comment 13 --body-file /private/tmp/s/comment.md"),
+            bash_result("g1", "https://github.com/o/r/pull/13#issuecomment-1"),
+            answer(REVIEW_COMMIT + "\n```bash\ncd /repo && git push\n```\n"),
+            user_command('cd /repo && git add a.java && git commit -m "[Refactor] 바꾼다"'),
+            user_command("cd /repo && git push"),
+            bash_call("s1", "cd /repo && git status --short"),
+            bash_result("s1", " M b.java"),
+            answer(COMMIT_ANSWER),
+        ])
+        self.assertEqual("", stdout.strip(), stdout)
+
+    def test_댓글을_올린_뒤_커밋과_푸시_명령을_주면_통과한다(self):
+        stdout = self.check([
+            human("반영해"),
+            bash_call("g1", "cd /repo && gh pr comment 13 --body-file /private/tmp/s/comment.md"),
+            bash_result("g1", "https://github.com/o/r/pull/13#issuecomment-1"),
+            bash_call("s1", "cd /repo && git status --short"),
+            bash_result("s1", " M a.java"),
+            answer(REVIEW_COMMIT + "\n```bash\ncd /repo && git push\n```\n"),
+        ])
+        self.assertEqual("", stdout.strip(), stdout)
+
+
 def codex_call(call_id, command):
     return {"type": "response_item", "payload": {
         "type": "custom_tool_call", "call_id": call_id, "name": "exec",

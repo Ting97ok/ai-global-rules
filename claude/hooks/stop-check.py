@@ -13,6 +13,12 @@
      그 문서의 독자 테스트(사본 폴더 이름이 reader-test-{문서 이름} 인 Codex 작업)를 돌리지 않은 것.
      doc-writing 「처음 읽는 독자로 확인한다」. 결과가 아니라 실행 여부만 보되, 오류로 끝난 호출과 완료 알림이 없는
      백그라운드 호출은 세지 않는다. 사용자가 마지막 메시지에서 한 줄에 「독자 테스트 생략」이라고 썼으면 넘어간다.
+  5. 커밋 명령을 낸 답 뒤에 받은 요청에 PR 댓글 판단 없이 답하는 것. 체크포인트에 대한 반박일 수 있어서다.
+     「댓글」을 적었거나 `gh pr comment` 를 돌렸으면 통과한다. 요청 뒤에 사용자가 `!` 명령을 돌렸으면 묻지 않는다.
+     Codex 교차 검증은 PR 댓글로 남기지 않으므로 교차 검증만으로는 묻지 않는다.
+  6. 커밋 명령의 `검토:` 줄에 PR 댓글 주소가 없는 것. 커밋은 사용자가 돌리므로 git-guard 9번이 실행되지 않는다.
+  7. 요청 뒤에 PR 댓글을 올렸는데 커밋 명령 뒤에 `git push` 블록이 없는 것.
+  5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다. 요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 뺀 사용자 메시지다.
 이미 이 훅으로 되돌아온 턴(stop_hook_active)은 다시 막지 않는다. 무한 루프 방지.
 """
 import json
@@ -23,7 +29,7 @@ import subprocess
 import sys
 
 from testrun import (FAILURE, as_text, called_paths, cd_targets, is_document, is_test_run, load_rows, run_failed,
-                     said_since_last_message, shell_command)
+                     said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -31,6 +37,13 @@ STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+p
 EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
 COMMIT = re.compile(r"\bgit\s+commit\b")
 GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
+GIT_PUSH = re.compile(r"\bgit\s+push\b")
+GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
+COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
+BASH_BLOCK = re.compile(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", re.S)
+# 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
+NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
+               "Stop hook feedback", "Base directory for this skill")
 # doc-writing 「처음 읽는 독자로 확인한다」의 「크게 고친 문서」 기준. 오타 수정 같은 작은 커밋은 묻지 않는다
 BIG_CHANGE = 50
 
@@ -172,6 +185,78 @@ def is_human_turn(row):
         and not any(b.get("type") == "tool_result" for b in blocks)
 
 
+def row_text(row):
+    return "\n".join(b.get("text", "") for b in content_blocks(row) if b.get("type") == "text")
+
+
+def is_request(row):
+    """사용자가 직접 쓴 요청인지. 작업 알림·스킬 본문·훅 되먹임·`!` 명령은 요청이 아니다."""
+    if codex_payload(row) is not None:
+        return is_human_turn(row)
+    if not is_human_turn(row) or row.get("isMeta") or row.get("isCompactSummary"):
+        return False
+    return not row_text(row).lstrip().startswith(NOT_REQUEST)
+
+
+def is_user_command(row):
+    return row.get("type") == "user" and row_text(row).lstrip().startswith("<bash-input>")
+
+
+def commands_in(rows):
+    """Bash 도구와 Codex exec 로 돌린 명령을 모은다."""
+    found = []
+    for r in rows:
+        p = codex_payload(r)
+        if p is not None:
+            if p.get("type") == "custom_tool_call":
+                found.append(shell_command(p.get("input")))
+        elif r.get("type") == "assistant":
+            found += [(b.get("input") or {}).get("command", "") or "" for b in content_blocks(r)
+                      if b.get("type") == "tool_use" and b.get("name") == "Bash"]
+    return found
+
+
+def answer_before(rows, index):
+    """index 줄 앞에서 마지막으로 나간 답의 글."""
+    for r in reversed(rows[:index]):
+        p = codex_payload(r)
+        if p is not None and p.get("type") == "message" and p.get("role") == "assistant":
+            return as_text(p.get("content"))
+        if p is None and r.get("type") == "assistant" and row_text(r).strip():
+            return row_text(r)
+    return ""
+
+
+def comment_problems(rows, last_text, blocks):
+    """「브랜치·PR 흐름」의 댓글 판단과 댓글 뒤의 커밋·푸시 명령을 본다.
+
+    답은 작업 알림 뒤에 나가기도 하므로 기준은 이번 턴이 아니라 마지막 요청이다.
+    """
+    problems = []
+    commits = [b for b in blocks if COMMIT.search(b)]
+    if any("검토:" in b and not COMMENT_URL.search(b) for b in commits):
+        problems.append("`검토:` 줄에는 그 결정을 남긴 PR 댓글 주소를 단다. 댓글을 먼저 올리고 그 주소를 붙인다")
+    requests = [i for i, r in enumerate(rows) if is_request(r)]
+    if not requests:
+        return problems
+    since = rows[requests[-1] + 1:]
+    # 스크립트 heredoc 안에 적힌 명령 글자는 실행한 명령이 아니다
+    comment_rows = [i for i, r in enumerate(since)
+                    if any(GH_COMMENT.search(without_heredoc_bodies(c)) for c in commands_in([r]))]
+    commented = bool(comment_rows)
+    # 댓글 뒤에 사용자가 `!` 로 커밋·푸시를 돌렸으면 그 댓글의 커밋은 이미 처리됐다
+    pending = commented and not any(is_user_command(r) for r in since[comment_rows[-1] + 1:])
+    if pending and commits and not any(GIT_PUSH.search(b) for b in blocks):
+        problems.append("이번 요청에서 PR 댓글을 올렸다. 댓글을 반영한 커밋 명령 뒤에 "
+                        "`cd {저장소} && git push` 블록을 따로 낸다")
+    if commented or "댓글" in last_text or any(is_user_command(r) for r in since):
+        return problems
+    if any(COMMIT.search(b) for b in BASH_BLOCK.findall(answer_before(rows, requests[-1]))):
+        problems.append("커밋 명령을 낸 답 뒤에 받은 요청이다. 사용자가 AI 결정에 반박해 방향이 바뀌었으면 "
+                        "「댓글 → 커밋 → 푸시」 순서로 가고, 아니면 댓글 대상이 아닌 이유를 답변에 한 줄로 적는다")
+    return problems
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -227,11 +312,8 @@ def main():
                     continue
                 last_test_failed = bool(FAILURE.search(as_text(b.get("content"))))
 
-    blocks = re.findall(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", last_text, re.S)
-    if not blocks:
-        return
-
-    problems = []
+    blocks = BASH_BLOCK.findall(last_text)
+    problems = comment_problems(rows, last_text, blocks)
     for b in blocks:
         first = b.strip().split("\n", 1)[0]
         # 앞의 cd … && 는 건너뛰고 실제 명령을 본다
