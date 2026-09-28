@@ -53,7 +53,8 @@ def report(args):
     start = max((i + 1 for i, row in enumerate(rows) if row.get("report")), default=0)
     items = {}
     for row in rows[start:]:
-        items.setdefault(row["item"], []).append(row)
+        if "item" in row:
+            items.setdefault(row["item"], []).append(row)
     for number, (item, rounds) in enumerate(items.items(), 1):
         print(f"{number}. {item}")
         for row in rounds:
@@ -61,6 +62,11 @@ def report(args):
             for key, label in FIELDS:
                 if key in row:
                     print(f"   - {label}: {row[key]}")
+    # 마지막 줄은 마지막 호출의 모델·사용량이다. 호출 기록이 없으면 usage.py 가 가장 최근 Codex 기록을 읽는다
+    calls = [row["run"]["codex_session"] for row in rows if "run" in row]
+    usage_out = subprocess.run([sys.executable, str(Path(__file__).with_name("usage.py")), *calls[-1:]],
+                               capture_output=True, text=True).stdout
+    print(usage_out, end="")
     write(args.session, {"report": True})
 
 
