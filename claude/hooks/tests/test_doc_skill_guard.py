@@ -216,6 +216,21 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_사용자가_실행한_명령은_새_요청으로_보지_않는다(self):
+        command = user_text("<bash-input>git status --short</bash-input><bash-stdout> M a.md</bash-stdout>")
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "design" / "plan.html"
+            rows = [user_text("계획 문서 써 줘"), skill_call("doc-writing"), skill_call("grill-me"), command]
+            result = run(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "transcript_path": transcript(rows, folder),
+                    "tool_input": {"file_path": str(doc)},
+                }
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+
     def test_컴팩트_요약은_새_요청으로_보지_않는다(self):
         summary = {"type": "user", "isCompactSummary": True, "isVisibleInTranscriptOnly": True,
                    "message": {"role": "user", "content": "This session is being continued from a previous conversation."}}
