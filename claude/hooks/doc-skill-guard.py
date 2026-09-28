@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""PreToolUse(Write|Edit|MultiEdit|Bash) — 문서를 작성하거나 수정하기 전에 doc-writing 과 캐묻기 스킬을 호출했는지 확인한다.
+"""PreToolUse(Write|Edit|MultiEdit|Bash) — 문서를 작성하거나 수정하기 전에 doc-writing 과 심층 인터뷰 스킬을 호출했는지 확인한다.
 
-전역 규칙 「문서 작성」이 doc-writing 을 먼저 호출하게 하고, doc-writing 「쓰기 전에 캐묻는다」가
+전역 규칙 「문서 작성」이 doc-writing 을 먼저 호출하게 하고, doc-writing 「쓰기 전에 심층 인터뷰를 진행한다」가
 grill-me 나 grill-with-docs 로 사용자에게 먼저 질문하게 한다. 그 호출이 대화 기록에 있는지만 확인한다.
 사용자가 「심층 인터뷰 생략」이라고 작성하거나 질문 창에서 그렇게 답했으면 심층 인터뷰 확인은 생략한다.
 종료 코드 2 + stderr 가 차단이다.
@@ -26,10 +26,10 @@ def skills(row):
 
 
 def scan(transcript_path):
-    """doc-writing 을 불렀는지, 지금 요청에서 캐물었는지, 앞서 캐물은 뒤 쓴 문서가 무엇인지 본다.
+    """doc-writing 을 불렀는지, 지금 요청에서 심층 인터뷰를 진행했는지, 앞서 심층 인터뷰를 마친 뒤 쓴 문서가 무엇인지 본다.
 
-    캐묻기와 생략은 사용자 메시지마다 새로 받는다. 앞선 요청의 캐묻기로 다른 문서까지 통과시키지 않기 위해서다.
-    다만 캐물은 뒤 쓴 문서는 같은 세션에서 다시 묻지 않는다. 리뷰를 반영하는 요청마다 같은 문서의 독자를 다시 묻게 되기 때문이다.
+    심층 인터뷰와 생략은 사용자 메시지마다 새로 받는다. 앞선 요청의 심층 인터뷰로 다른 문서까지 통과시키지 않기 위해서다.
+    다만 심층 인터뷰를 마친 뒤 쓴 문서는 같은 세션에서 다시 묻지 않는다. 리뷰를 반영하는 요청마다 같은 문서의 독자를 다시 묻게 되기 때문이다.
     """
     rows = load_rows(transcript_path)
     wrote = any(SKILL in skills(r) for r in rows)
@@ -63,7 +63,7 @@ def main():
         sys.exit(2)
     if asked or all(os.path.realpath(p) in covered for p in docs):
         return
-    print(f"[doc-skill-guard] 문서를 쓰거나 고치기 전에 `grill-me` 나 `grill-with-docs` 로 사용자에게 캐묻는다. "
+    print(f"[doc-skill-guard] 문서를 쓰거나 고치기 전에 `grill-me` 나 `grill-with-docs` 로 사용자에게 심층 인터뷰를 진행한다. "
           f"건너뛰려면 사용자가 「{SKIP}」이라고 말해야 한다. {target}", file=sys.stderr)
     sys.exit(2)
 
