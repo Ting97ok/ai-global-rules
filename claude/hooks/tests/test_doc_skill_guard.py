@@ -88,7 +88,7 @@ class DocSkillGuard(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("doc-writing", result.stderr)
 
-    def test_캐묻지_않고_새_문서를_만들면_막는다(self):
+    def test_심층_인터뷰_없이_새_문서를_만들면_막는다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
             result = run(
@@ -102,7 +102,7 @@ class DocSkillGuard(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("grill-me", result.stderr)
 
-    def test_이미_있는_문서를_캐묻지_않고_고쳐도_막는다(self):
+    def test_이미_있는_문서를_심층_인터뷰_없이_고쳐도_막는다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
             doc.parent.mkdir()
@@ -118,7 +118,7 @@ class DocSkillGuard(unittest.TestCase):
             self.assertEqual(2, result.returncode, result.stderr)
             self.assertIn("grill-me", result.stderr)
 
-    def test_캐묻기_스킬을_불렀으면_새_문서를_만들_수_있다(self):
+    def test_심층_인터뷰_스킬을_불렀으면_새_문서를_만들_수_있다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
             for grill in ("grill-me", "grill-with-docs"):
@@ -133,7 +133,7 @@ class DocSkillGuard(unittest.TestCase):
                     )
                     self.assertEqual(0, result.returncode, result.stderr)
 
-    def test_앞선_요청에서_부른_캐묻기는_새_요청에_쓰지_않는다(self):
+    def test_앞선_요청에서_부른_심층_인터뷰는_새_요청에_쓰지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
             rows = [
@@ -232,10 +232,10 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
 
-    def test_앞선_요청의_캐묻기_생략은_새_요청에_쓰지_않는다(self):
+    def test_앞선_요청의_심층_인터뷰_생략은_새_요청에_쓰지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
-            rows = [user_text("캐묻기 생략"), skill_call("doc-writing"), user_text("이제 다른 문서도 고쳐 줘")]
+            rows = [user_text("심층 인터뷰 생략"), skill_call("doc-writing"), user_text("이제 다른 문서도 고쳐 줘")]
             result = run(
                 {
                     "hook_event_name": "PreToolUse",
@@ -246,11 +246,11 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(2, result.returncode, result.stderr)
 
-    def test_캐묻기_생략은_한_줄에_그_말만_썼을_때만_센다(self):
+    def test_심층_인터뷰_생략은_한_줄에_그_말만_썼을_때만_센다(self):
         cases = {
-            "따로 쓴 줄": ("이번 메모는 바로 써 줘\n캐묻기 생략", 0),
-            "부정하는 문장": ("캐묻기 생략은 하지 마", 2),
-            "문장 속에 섞인 말": ("이번 메모는 캐묻기 생략하고 바로 써 줘", 2),
+            "따로 쓴 줄": ("이번 메모는 바로 써 줘\n심층 인터뷰 생략", 0),
+            "부정하는 문장": ("심층 인터뷰 생략은 하지 마", 2),
+            "문장 속에 섞인 말": ("이번 메모는 심층 인터뷰 생략하고 바로 써 줘", 2),
         }
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
@@ -266,11 +266,11 @@ class DocSkillGuard(unittest.TestCase):
                     )
                     self.assertEqual(expected, result.returncode, result.stderr)
 
-    def test_스킬_본문이나_작업_알림의_캐묻기_생략_문구로는_통과하지_않는다(self):
+    def test_스킬_본문이나_작업_알림의_심층_인터뷰_생략_문구로는_통과하지_않는다(self):
         rows = {
             "스킬 본문": {"type": "user", "isMeta": True,
-                      "message": {"role": "user", "content": "사용자가 「캐묻기 생략」이라고 하면 건너뛴다"}},
-            "작업 알림": user_text("<task-notification>\n<summary>캐묻기 생략 확인</summary>\n</task-notification>"),
+                      "message": {"role": "user", "content": "사용자가 「심층 인터뷰 생략」이라고 하면 건너뛴다"}},
+            "작업 알림": user_text("<task-notification>\n<summary>심층 인터뷰 생략 확인</summary>\n</task-notification>"),
         }
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
@@ -286,7 +286,7 @@ class DocSkillGuard(unittest.TestCase):
                     )
                     self.assertEqual(2, result.returncode, result.stderr)
 
-    def test_질문_창의_답만_캐묻기_생략으로_센다(self):
+    def test_질문_창의_답만_심층_인터뷰_생략으로_센다(self):
         def answer_row(question, answer):
             return {
                 "type": "user",
@@ -296,8 +296,8 @@ class DocSkillGuard(unittest.TestCase):
             }
 
         cases = {
-            "답이 캐묻기 생략": (answer_row("이 문서를 어떻게 시작할까요?", "캐묻기 생략"), 0),
-            "질문에만 그 말이 있음": (answer_row("캐묻기 생략할까요?", "아니, 물어봐"), 2),
+            "답이 심층 인터뷰 생략": (answer_row("이 문서를 어떻게 시작할까요?", "심층 인터뷰 생략"), 0),
+            "질문에만 그 말이 있음": (answer_row("심층 인터뷰 생략할까요?", "아니, 물어봐"), 2),
         }
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
