@@ -212,11 +212,16 @@ NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-st
 
 
 def human_message(row):
-    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약은 뺀다."""
-    content = (row.get("message") or {}).get("content")
-    if row.get("type") != "user" or row.get("isMeta") or row.get("isCompactSummary") or not isinstance(content, str):
+    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약은 뺀다.
+
+    이미지를 붙인 메시지는 글이 블록 목록으로 들어온다. 도구 결과가 든 줄(질문 창 답 포함)은 요청이 아니다.
+    """
+    blocks = content_blocks(row)
+    if row.get("type") != "user" or row.get("isMeta") or row.get("isCompactSummary") \
+            or any(b.get("type") == "tool_result" for b in blocks):
         return ""
-    return "" if content.lstrip().startswith(NOT_REQUEST) else content
+    text = "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+    return "" if text.lstrip().startswith(NOT_REQUEST) else text
 
 
 def answers(row):
