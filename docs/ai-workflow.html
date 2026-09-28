@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>AI Workflow</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #172033;
+      --muted: #5d6879;
+      --line: #dbe1e8;
+      --accent: #1769aa;
+      --accent-soft: #eaf4fc;
+      --code: #f1f4f7;
+      --flow-ai: #6d4fc2;
+      --flow-gate: #a8730a;
+      --flow-gate-soft: #fdf3d8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10141b;
+        --surface: #171d27;
+        --text: #edf1f7;
+        --muted: #abb5c4;
+        --line: #303948;
+        --accent: #72b7ec;
+        --accent-soft: #172d3e;
+        --code: #242c38;
+        --flow-ai: #b9a4f2;
+        --flow-gate: #e2b95b;
+        --flow-gate-soft: #3a3016;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      font-size: 17px;
+      line-height: 1.75;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    /* 돌아가기 바: 스크롤해도 위에 남는다. 오른쪽에 회고로 가는 링크를 둔다 */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 90%, transparent);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .topbar-in {
+      width: min(100% - 40px, 760px);
+      height: 52px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .back, .to-essay {
+      color: var(--text);
+      font-size: 0.92rem;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    .back { margin-left: -12px; }
+    .to-essay { margin-right: -12px; }
+
+    .back:hover, .back:focus-visible, .to-essay:hover, .to-essay:focus-visible { background: var(--accent-soft); color: var(--accent); }
+
+    main {
+      width: min(100% - 40px, 760px);
+      margin: 0 auto;
+      padding: 56px 0 40px;
+    }
+
+    .intro {
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1, h2, h3 { letter-spacing: -0.03em; }
+
+    h1 {
+      margin: 0 0 18px;
+      font-size: clamp(1.9rem, 5.5vw, 2.9rem);
+      font-weight: 780;
+      line-height: 1.25;
+    }
+
+    h2 {
+      margin: 0 0 20px;
+      font-size: clamp(1.4rem, 4vw, 1.9rem);
+      line-height: 1.3;
+    }
+
+    p { margin: 0 0 18px; }
+
+    a { color: var(--accent); text-underline-offset: 0.18em; }
+
+    code {
+      padding: 0.12em 0.32em;
+      border-radius: 4px;
+      background: var(--code);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86em;
+      word-break: break-word;
+    }
+
+    .byline { margin-bottom: 24px; color: var(--muted); font-size: 0.96rem; }
+
+    .lede { margin-bottom: 26px; }
+
+    .summary {
+      margin: 0;
+      padding: 20px 24px 22px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .summary-title { margin: 0 0 8px; color: var(--accent); font-weight: 700; }
+    .summary ul { margin: 0; padding-left: 1.2rem; }
+    .summary li + li { margin-top: 10px; }
+    .summary b { font-weight: 700; }
+
+    .toc { margin: 32px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.95rem; }
+
+    section { padding: 48px 0 8px; }
+    section + section { border-top: 1px solid var(--line); }
+
+    table { width: 100%; border-collapse: collapse; margin: 0 0 22px; font-size: 0.95rem; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { font-weight: 700; }
+    td:first-child { white-space: nowrap; }
+
+    .swatch { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border-radius: 3px; vertical-align: -2px; border: 1.5px solid; }
+    .swatch.ai { background: color-mix(in srgb, var(--flow-ai) 9%, var(--surface)); border-color: var(--flow-ai); }
+    .swatch.dev { background: var(--flow-gate-soft); border-color: var(--flow-gate); }
+    .swatch.codex { background: color-mix(in srgb, #0f766e 10%, var(--surface)); border-color: #0f766e; }
+    .swatch.art { background: var(--surface); border-color: var(--muted); border-radius: 0; }
+    .swatch.tag { background: var(--code); border-color: var(--muted); border-width: 1px; border-radius: 0; }
+    @media (prefers-color-scheme: dark) { .swatch.codex { background: color-mix(in srgb, #5eead4 10%, var(--surface)); border-color: #5eead4; } }
+
+    /* 장치 설명: 그림 꼬리표의 번호와 이름에 설명을 잇는다. 본문 폭 안에 둔다 */
+    ol.notes { list-style: none; margin: 14px 0 0; padding: 0; font-size: 0.9rem; line-height: 1.65; color: var(--muted); }
+    ol.notes > li { margin: 0 0 8px; }
+    ol.notes .num { font-weight: 700; color: var(--text); }
+    ol.notes b, ol.notes code { color: var(--text); }
+    ol.notes ul { margin: 2px 0 0; padding-left: 20px; }
+    /* 라벨 목록(언제·막는 것·알리는 것·건너뛰는 경우·하는 일). 좁은 화면에서는 라벨을 내용 위에 둔다 */
+    ol.notes dl { display: grid; grid-template-columns: 7.5em 1fr; gap: 2px 12px; margin: 4px 0 0; padding-left: 20px; }
+    ol.notes dt { color: var(--text); font-weight: 600; }
+    ol.notes dd { margin: 0; }
+    ol.notes dd ul { margin: 0; padding-left: 18px; }
+    ol.notes table { margin: 8px 0 4px; font-size: inherit; }
+    ol.notes th { color: var(--text); }
+    ol.notes td:first-child { white-space: normal; }
+    ol.notes td code { white-space: nowrap; }
+    @media (max-width: 560px) {
+      ol.notes dl { grid-template-columns: 1fr; gap: 0; }
+      ol.notes dd { margin-bottom: 6px; }
+    }
+
+    .always { margin: 0; padding-left: 1.2rem; }
+    .always li + li { margin-top: 8px; }
+
+    .closing { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+
+    /* 그림은 본문 폭보다 넓게 둔다. 좁은 화면에서는 그림 영역 안에서만 가로로 스크롤한다 */
+    /* flow-b:start */
+.flow-b { --flow-codex: #0f766e; width: min(100vw - 32px, 1240px); margin: 26px 0; position: relative; left: 50%; transform: translateX(-50%); }
+@media (prefers-color-scheme: dark) { .flow-b { --flow-codex: #5eead4; } }
+.flow-b svg { display: block; width: 100%; height: auto; }
+.flow-b svg + svg { margin-top: 40px; }
+.flow-b text { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; font-size: 13px; fill: var(--text); }
+.flow-b .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.flow-b .page-title { font-size: 15px; font-weight: 700; }
+.flow-b .title, .flow-b .lane-name { font-size: 14px; font-weight: 700; }
+.flow-b .lead, .flow-b .nav, .flow-b .sub, .flow-b .memo, .flow-b .legend { fill: var(--muted); }
+.flow-b .band-title, .flow-b .num, .flow-b .tagname { font-weight: 700; }
+.flow-b .num { font-size: 15px; }
+.flow-b .rule { stroke: var(--line); stroke-width: 1; }
+.flow-b .cell.ai .shape { fill: color-mix(in srgb, var(--flow-ai) 9%, var(--surface)); stroke: var(--flow-ai); stroke-width: 1.5; }
+.flow-b .cell.dev .shape { fill: var(--flow-gate-soft); stroke: var(--flow-gate); stroke-width: 1.5; }
+.flow-b .cell.codex .shape { fill: color-mix(in srgb, var(--flow-codex) 10%, var(--surface)); stroke: var(--flow-codex); stroke-width: 1.5; }
+.flow-b .cell.decision .shape { stroke-width: 1.5; }
+.flow-b .dtitle { font-size: 13px; font-weight: 700; fill: var(--text); }
+.flow-b .merge { fill: var(--muted); }
+.flow-b .swatch-decision { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.flow-b .cell.art .shape { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; }
+.flow-b .cell.art .fold { fill: none; stroke: var(--muted); stroke-width: 1.2; }
+.flow-b .cell.note .shape, .flow-b .tag rect { fill: var(--code); stroke: var(--muted); stroke-width: 1; }
+.flow-b .c, .flow-b .bridge { fill: none; stroke: var(--muted); stroke-width: 1.8; }
+.flow-b .bridge-cut { fill: var(--bg); }
+.flow-b .c.back { stroke-dasharray: 5 4; }
+.flow-b .ah, .flow-b .end-dot { fill: var(--muted); }
+.flow-b .end-ring { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.flow-b .mask { fill: var(--bg); }
+.flow-b .lbl, .flow-b .stage { font-weight: 600; fill: var(--muted); }
+.flow-b figcaption { max-width: 760px; margin: 16px auto 0; color: var(--muted); font-size: 0.93rem; }
+.flow-b ol.notes { list-style: none; margin: 14px 0 0; padding: 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.flow-b ol.notes > li { margin: 0 0 6px; }
+.flow-b ol.notes .num { font-weight: 700; color: var(--text); }
+.flow-b ol.notes b, .flow-b ol.notes code { color: var(--text); }
+.flow-b ol.notes code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; }
+.flow-b ol.notes ul { margin: 2px 0 0; padding-left: 20px; }
+.flow-b ol.notes + svg { margin-top: 40px; }
+/* flow-b:end */
+    .flow-b { margin: 26px 0 0; }
+    @media (max-width: 900px) {
+      .flow-b { overflow-x: auto; }
+      .flow-b svg { min-width: 900px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-in">
+      <a class="back" href="https://github.com/Ting97ok/ai-global-rules#readme" data-back>← ai-global-rules README</a>
+      <a class="to-essay" href="index.html">회고 읽기 →</a>
+    </div>
+  </div>
+
+  <main>
+    <header class="intro">
+      <h1>AI Workflow</h1>
+      <p class="byline">최대현 · 백엔드 개발자 · <a href="https://github.com/Ting97ok">github.com/Ting97ok</a></p>
+      <p class="lede">이 문서는 <a href="https://github.com/Ting97ok/ai-global-rules">ai-global-rules</a> 저장소의 규칙이 작업 흐름의 어느 단계에서 적용되는지 보여 준다. 요청부터 병합까지를 그림 여섯 장으로 나눴다. 이 흐름을 왜 이렇게 만들었는지는 회고 <a href="index.html">「AI와 일하며 가장 많이 고친 건 문서였다」</a>에 기록했다.</p>
+      <div class="summary">
+        <p class="summary-title">요약</p>
+        <ul>
+          <li><b>역할</b>: Claude가 설계 문서 초안과 구현을 작성한다. 개발자는 설계를 이해하고 리뷰하고 커밋한다. Codex(OpenAI의 코딩 에이전트)는 문서를 따로 읽고 검토한다.</li>
+          <li><b>관문</b>: 개발자가 설계 문서를 이해해야 구현을 시작한다. 사이클이 끝날 때마다 개발자가 리뷰해야 커밋한다.</li>
+          <li><b>강제</b>: 반드시 지킬 항목 가운데 기계로 확인할 수 있는 것은 훅이 Claude의 도구 호출과 답변에서 검사한다. 설계를 이해했는지와 검증 결과가 맞는지는 개발자가 판단한다.</li>
+        </ul>
+      </div>
+      <ul class="toc">
+        <li><a href="#reading">읽는 법</a></li>
+        <li><a href="#ch1">1장 요청과 설계 초안</a></li>
+        <li><a href="#ch2">2장 초안 검토와 확인</a></li>
+        <li><a href="#ch3">3장 이해·토론과 드래프트 PR</a></li>
+        <li><a href="#ch4">4장 TDD 사이클과 리뷰</a></li>
+        <li><a href="#ch5">5장 인수 확인</a></li>
+        <li><a href="#ch6">6장 전체 검토·반영·병합</a></li>
+        <li><a href="#always">모든 장에 적용되는 장치</a></li>
+      </ul>
+    </header>
+
+    <section id="reading">
+      <h2>읽는 법</h2>
+      <p>그림은 흐름을 세 단위로 나눈다.</p>
+      <ul>
+        <li><b>설계 문서</b>: 기능 하나를 설명하고 구현을 여러 작업으로 나눈다.</li>
+        <li><b>브랜치</b>: 설계 문서가 나눈 작업 하나를 담는다. 다음 작업은 새 브랜치에서 시작한다.</li>
+        <li><b>사이클</b>: 브랜치 안에서 RED → GREEN을 한 번 진행하는 단위다.</li>
+      </ul>
+      <p>그림의 색과 모양은 아래 뜻으로 사용한다.</p>
+      <table>
+        <thead><tr><th>표기</th><th>뜻</th></tr></thead>
+        <tbody>
+          <tr><td><span class="swatch ai"></span>보라 상자</td><td>Claude가 하는 절차</td></tr>
+          <tr><td><span class="swatch dev"></span>노란 상자</td><td>개발자가 하는 절차</td></tr>
+          <tr><td><span class="swatch codex"></span>청록 상자</td><td>Codex가 하는 절차</td></tr>
+          <tr><td><span class="swatch art"></span>흰 상자</td><td>산출물. 오른쪽 위 모서리가 접혀 있다.</td></tr>
+          <tr><td>마름모</td><td>판단. 색은 판단하는 쪽을 뜻한다.<br>4장과 6장에 있다.</td></tr>
+          <tr><td>실선 · 점선</td><td>진행 · 되돌아감</td></tr>
+          <tr><td><span class="swatch tag"></span>회색 꼬리표</td><td>그 절차에 적용되는 훅·스킬·전역 규칙·설정.<br>이 문서는 이것들을 장치라고 부른다.<br>번호는 그림 아래 장치 설명의 번호다.</td></tr>
+        </tbody>
+      </table>
+      <p>그림의 꼬리표 가운데 훅과 스킬은 아래 표로 구분한다.</p>
+      <table>
+        <thead><tr><th>구분</th><th>정의</th><th>적용 시점</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td>훅</td><td>정해진 조건에서 반드시 실행되는 검사 스크립트</td><td>Claude가 도구를 호출하기 전후와 답변을 끝내기 전</td><td>규칙을 어긴 호출을 차단하거나 답변을 반려한다.<br>알림만 보내는 훅도 있다.</td></tr>
+          <tr><td>스킬</td><td>필요할 때만 호출해 읽는 지시 파일</td><td>Claude가 작업에 맞는 스킬을 호출할 때</td><td>그 작업에서 따를 규칙과 절차를 Claude에게 전달한다.</td></tr>
+        </tbody>
+      </table>
+      <p>개발자가 직접 실행하는 명령에는 훅이 적용되지 않는다.</p>
+      <p>장치 설명에 나오는 용어는 아래 뜻으로 사용한다.</p>
+      <ul>
+        <li><b>체크포인트 보고</b>: Claude가 작업을 멈추고 작업 내역과 추천 커밋 명령을 제시하는 답변</li>
+        <li><b>턴</b>: 개발자 메시지 하나에 Claude가 한 번 답하는 단위</li>
+        <li><b>세션</b>: Claude Code(Anthropic의 코딩 에이전트) 대화 하나</li>
+      </ul>
+      <p>훅과 스킬 파일은 아래에 있다.</p>
+      <ul>
+        <li><b>훅</b>: <a href="https://github.com/Ting97ok/ai-global-rules/tree/main/claude/hooks"><code>claude/hooks/</code></a>. 그림 아래 장치 설명에는 훅마다 적용 시점과 차단 대상·알림 내용만 기록했다. 검사 범위와 한계는 <a href="https://github.com/Ting97ok/ai-global-rules#자동-검사-범위">README 「자동 검사 범위」</a>에, 세부 조건은 각 훅 파일 첫머리에 있다.</li>
+        <li><b>전역 규칙</b>: <a href="https://github.com/Ting97ok/ai-global-rules/blob/main/claude/CLAUDE.md"><code>claude/CLAUDE.md</code></a>.</li>
+        <li><b>저장소 스킬</b>: <a href="https://github.com/Ting97ok/ai-global-rules/tree/main/claude/skills"><code>claude/skills/</code></a>의 codex-cross-check·doc-writing. render-check.js는 doc-writing 폴더 안에 있다.</li>
+        <li><b>외부 스킬</b>: grill-me와 grill-with-docs는 <a href="https://github.com/mattpocock/skills">mattpocock/skills</a>에서 가져와 커스텀하여 사용한다. ij-debugger는 IntelliJ IDEA가 설치한 그대로 사용한다. 세 스킬은 저장소에 포함하지 않았다. 수정한 내용과 출처는 <a href="https://github.com/Ting97ok/ai-global-rules#공개-범위">README의 「공개 범위」</a>에 기록했다.</li>
+        <li><b>플러그인 스킬</b>: ponytail-review는 ponytail 플러그인, humanize 진단은 humanize-korean 플러그인의 스킬이다. 플러그인을 켜는 설정과 플러그인 저장소 주소는 <a href="https://github.com/Ting97ok/ai-global-rules/blob/main/claude/settings.json"><code>claude/settings.json</code></a>에 있다.</li>
+      </ul>
+    </section>
+
+    <section id="ch1">
+      <h2>1장 요청과 설계 초안</h2>
+      <p>개발자의 요청에서 시작한다. Claude는 개발자의 요청 범위·의도나 진행 상황이 모호하면 코드나 문서를 찾아보기 전에 먼저 질문한다. Claude는 문서를 작성하기 전에 누가 읽을 문서인지와 어떤 내용을 담을지 개발자에게 구체적으로 질문한다. 이 절차를 심층 인터뷰라고 부른다. 개발자의 답으로 Claude가 설계 문서 초안을 작성한다.</p>
+      <figure class="flow-b">
+        <!-- ch1:start -->
+<svg class="page" id="fb-p1" viewBox="0 64 1240 434" role="img" aria-labelledby="fb-p1-title fb-p1-desc">
+<title id="fb-p1-title">1장 요청과 설계 · 요청 확정과 초안</title>
+<desc id="fb-p1-desc">1장. 개발자가 요청하면 Claude는 요청 범위·의도나 진행 상황이 모호할 때만 코드나 문서를 찾아보기 전에 먼저 질문한다. 개발자가 답해 요청을 확정한다. Claude가 누가 읽을 문서인지와 어떤 내용을 담을지 구체적으로 질문하고 개발자가 답한 뒤 Claude가 설계 문서 초안을 작성한다. 초안에는 doc-writing, doc-skill-guard.py, prose-check.py 가 적용된다.</desc>
+<defs><marker id="fb-p1-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<g class="cell ai swatch"><rect class="shape" x="16" y="190" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="220">Claude</text>
+<line class="rule" x1="16" y1="88" x2="1224" y2="88"/>
+<line class="rule" x1="16" y1="352" x2="1224" y2="352"/>
+<g class="cell dev swatch"><rect class="shape" x="16" y="385" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="415">개발자</text>
+<line class="rule" x1="16" y1="478" x2="1224" y2="478"/>
+<line class="rule" x1="80" y1="88" x2="80" y2="478"/>
+<path class="c" d="M160 376 L160 180 Q160 172 168 172 L192 172" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M368 160 L408 160 Q416 160 416 168 L416 376" marker-end="url(#fb-p1-ah)"/>
+<path class="c back" d="M384 376 L384 192 Q384 184 376 184 L368 184" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M744 160 L784 160 Q792 160 792 168 L792 376" marker-end="url(#fb-p1-ah)"/>
+<path class="c back" d="M760 376 L760 192 Q760 184 752 184 L744 184" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M464 415 L504 415" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M568 376 L568 180 Q568 172 576 172 L600 172" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M800 415 L812 415 Q820 415 820 407 L820 180 Q820 172 828 172 L840 172" marker-end="url(#fb-p1-ah)"/>
+<path class="c" d="M1016 172 L1048 172" marker-end="url(#fb-p1-ah)"/>
+<rect class="mask" x="1056" y="163" width="172" height="18" rx="2"/>
+<text class="lbl" x="1061" y="176">다음 장: 2장 독자 테스트 →</text>
+<g class="cell ai"><rect class="shape" x="192" y="112" width="176" height="120" rx="6"/><text class="title" x="204" y="136">먼저 질문</text><text class="sub" x="204" y="158">요청 범위·의도나 진행</text><text class="sub" x="204" y="176">상황이 모호하면</text><text class="sub" x="204" y="200">코드나 문서를 찾아보기</text><text class="sub" x="204" y="218">전에 질문한다</text></g>
+<g class="tag"><rect x="192" y="240" width="164" height="42"/><text x="200" y="257"><tspan class="num">①</tspan> <tspan class="tagname">전역 규칙</tspan></text><text x="215.504" y="275"><tspan class="tagname">「모호하면 먼저 질문」</tspan></text></g>
+<g class="cell ai"><rect class="shape" x="600" y="112" width="144" height="120" rx="6"/><text class="title" x="612" y="136">심층 인터뷰</text><text class="sub" x="612" y="158">독자·문체와 담을</text><text class="sub" x="612" y="176">내용을 질문한다</text><text class="sub" x="612" y="200">첫 질문은 독자</text></g>
+<g class="tag"><rect x="600" y="240" width="148" height="42"/><text x="608" y="257"><tspan class="num">②</tspan> <tspan class="tagname">grill-me ·</tspan></text><text x="623.504" y="275"><tspan class="tagname">grill-with-docs</tspan></text></g>
+<g class="cell ai"><rect class="shape" x="840" y="112" width="176" height="120" rx="6"/><text class="title" x="852" y="136">설계 문서 초안</text></g>
+<g class="tag"><rect x="840" y="240" width="116" height="24"/><text x="848" y="257"><tspan class="num">③</tspan> <tspan class="tagname">doc-writing</tspan></text></g>
+<g class="tag"><rect x="840" y="272" width="176" height="24"/><text x="848" y="289"><tspan class="num">④</tspan> <tspan class="mono">doc-skill-guard.py</tspan></text></g>
+<g class="tag"><rect x="840" y="304" width="144" height="24"/><text x="848" y="321"><tspan class="num">⑤</tspan> <tspan class="mono">prose-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="96" y="376" width="128" height="78" rx="6"/><text class="title" x="108" y="400">요청</text><text class="sub" x="108" y="422">작업 요청</text></g>
+<g class="cell dev"><rect class="shape" x="336" y="376" width="128" height="78" rx="6"/><text class="title" x="348" y="400">답변</text><text class="sub" x="348" y="422">진행 상황·범위·</text><text class="sub" x="348" y="440">의도</text></g>
+<g class="cell art"><path class="shape" d="M504 376 H618 L632 390 V454 H504 Z"/><path class="fold" d="M618 376 V390 H632"/><text class="title" x="516" y="400">확정된 요청</text><text class="sub" x="516" y="422">범위가 정해진 요청</text></g>
+<g class="cell dev"><rect class="shape" x="672" y="376" width="128" height="78" rx="6"/><text class="title" x="684" y="400">답변</text><text class="sub" x="684" y="422">독자·범위</text></g>
+</svg>
+<!-- ch1:end -->
+      </figure>
+      <!-- notes1:start -->
+<ol class="notes">
+<li><span class="num">①</span> <b>전역 규칙 「모호하면 먼저 질문」</b><dl><dt>적용 시점</dt><dd>개발자가 아는 사실(진행 상황·완료 여부·범위·의도)이 모호할 때</dd><dt>역할</dt><dd>Claude가 코드나 문서를 찾아보기 전에 개발자에게 먼저 질문한다.</dd></dl></li>
+<li><span class="num">②</span> <b>grill-me · grill-with-docs</b><dl><dt>적용 시점</dt><dd>Claude가 문서를 작성하거나 수정하기 전</dd><dt>역할</dt><dd>Claude가 누가 읽을 문서인지와 문체를 먼저 질문하고 담을 내용을 구체적으로 질문한다. 저장소 규칙 파일(CLAUDE.md)이 결정과 용어를 기록한 문서를 따로 지정했으면 grill-with-docs 로 그 문서와 대조해 질문한다.</dd></dl></li>
+<li><span class="num">③</span> <b>doc-writing</b><dl><dt>적용 시점</dt><dd>Claude가 문서를 작성하거나 수정할 때</dd><dt>역할</dt><dd>문체·어휘·형식과 확인 절차의 규칙을 Claude에게 전달한다.</dd></dl></li>
+<li><span class="num">④</span> <code>doc-skill-guard.py</code><dl><dt>적용 시점</dt><dd>Claude가 파일 편집 도구나 셸 명령(예: &gt;·sed -i)으로 문서 파일을 작성하거나 수정하기 전</dd><dt>차단 대상</dt><dd>Claude는 문서를 작성하기 전에 doc-writing과 심층 인터뷰 스킬을 모두 호출해야 한다. 둘 중 하나라도 호출하지 않았으면 해당 편집이나 셸 명령을 차단한다.</dd><dt>검사 생략 조건</dt><dd><ul><li>개발자가 요청이나 질문 창 답에 「심층 인터뷰 생략」을 별도의 한 줄로 기록하면 그 요청에서는 심층 인터뷰 확인을 생략한다. doc-writing 호출 여부는 그대로 확인한다.</li><li>같은 세션에서 심층 인터뷰를 마친 뒤 그 문서를 수정하면 심층 인터뷰 확인을 생략한다.</li></ul></dd></dl></li>
+<li><span class="num">⑤</span> <code>prose-check.py</code>: Claude가 .md·.html 문서를 작성하거나 수정한 직후 그 문서에서 아직 커밋하지 않은 줄만 검사한다. 파일 변경을 되돌리지 않고 위반을 Claude에게 알린다.<table><thead><tr><th>검사</th><th>예</th><th>처리</th></tr></thead><tbody><tr><td>전각 대시로 두 문장 잇기</td><td><code>초안을 먼저 쓴다 — 그다음 고친다</code></td><td>Claude에게 오류로 알려 다시 수정하게 한다</td></tr><tr><td>표 칸 한 줄에 문장 두 개</td><td><code>막는다. 알린다.</code></td><td>Claude에게 오류로 알려 다시 수정하게 한다</td></tr><tr><td>연결어미 뒤 쉼표</td><td><code>~지만,</code> <code>~는데,</code> <code>~하고,</code></td><td>Claude에게 오류로 알려 다시 수정하게 한다</td></tr><tr><td>질문형 제목</td><td><code>왜 훅인가?</code></td><td>Claude에게 참고로 알린다</td></tr><tr><td>제목 안의 개수</td><td><code>근거 문서 두 편</code></td><td>Claude에게 참고로 알린다</td></tr><tr><td>잦은 「~기 때문」</td><td>열 문장에 두 번 이상</td><td>Claude에게 참고로 알린다</td></tr><tr><td>명사와 헷갈리는 「~고,」</td><td><code>받고,</code></td><td>Claude에게 참고로 알린다</td></tr></tbody></table></li>
+</ol>
+<!-- notes1:end -->
+    </section>
+
+    <section id="ch2">
+      <h2>2장 초안 검토와 확인</h2>
+      <p>독자 테스트는 작성 중인 문서에 대한 사전 지식이 없는 Codex에게 문서만 주고 작성자의 의도에 맞게 이해했는지 질문하는 절차다. Claude는 Codex의 답변과 함께 빠진 설명과 필요 없는 글을 받는다. Claude와 Codex가 피드백의 반영 여부를 각각 판단하고 결과를 대조한다. 수정한 뒤에는 반영할 새 피드백이 없을 때까지 독자 테스트를 반복한다.</p>
+      <p>공개 문서나 중요한 설계의 최종안이면 내용이 맞는지도 교차 검증으로 확인한다. Claude가 먼저 답을 기록해 두고 Codex는 그 답을 모르는 채 같은 질문에 답한다. 두 답이 불일치하면 2~3회 다시 질문한다. 그래도 합의하지 못하면 개발자가 결정한다.</p>
+      <p>그 뒤 Claude가 어휘, AI 문체, 실제 화면을 차례로 확인한다. 어휘 대조는 Claude가 심층 인터뷰에서 결정한 문체에 동사가 맞는지 확인하는 절차다. 명사·동사·한자어가 보통 사람이 같은 뜻으로 사용하는 말인지도 하나씩 확인한다. 독자 테스트 대상 문서는 커밋하기 전에 마지막 수정본으로 독자 테스트를 한 번 더 실행한다. 이 테스트의 피드백도 같은 방식으로 반영하고 반영할 새 피드백이 없을 때까지 반복한다. 개발자는 그 뒤 3장에서 최종 문서를 리뷰한다.</p>
+      <figure class="flow-b">
+        <!-- ch2:start -->
+<svg class="page" id="fb-p2" viewBox="0 64 1240 660" role="img" aria-labelledby="fb-p2-title fb-p2-desc">
+<title id="fb-p2-title">2장 설계 · 초안 검토와 확인</title>
+<desc id="fb-p2-desc">2장. Claude가 문서 사본만 둔 폴더를 생성하고 독자와 질문을 기록해 독자 테스트를 준비한다. Codex가 사본만 보고 질문에 답하고 빠진 설명과 필요 없는 글을 찾는다. 반영할 피드백은 Claude와 Codex가 교차 검증으로 결정하고 Claude가 수정한다. 수정했으면 독자 테스트를 다시 실행하고 반영할 새 피드백이 없을 때까지 반복한다. 교차 검증 대상이면 Claude가 질문에 먼저 답하고 답과 근거를 파일에 기록한 뒤 결론 없이 검증을 요청한다. Codex는 Claude의 답을 모르는 채 같은 질문에 답하고 Claude가 두 답을 항목별로 대조해 맞는 반론만 반영한다. 두 답이 불일치하면 근거와 통합안을 전달해 2~3회 다시 질문한다. 그래도 합의하지 못하면 개발자가 결정한다. 교차 검증 대상이 아니거나 대조를 마치면 Claude가 어휘 대조, humanize 진단, 렌더 확인을 이어서 진행한다. 렌더 확인을 통과하면 Codex가 마지막 독자 테스트를 진행하고 3장으로 간다. 렌더 확인에서 산문을 수정하면 어휘 대조부터, 의미나 범위가 바뀌면 독자 테스트부터 다시 진행한다. 독자 테스트 대상 문서는 커밋하기 전에 마지막 수정본으로 독자 테스트를 한 번 더 실행한다. 이 테스트의 피드백도 같은 방식으로 반영하고 반영할 새 피드백이 없을 때까지 반복한다. 개발자는 그 뒤 3장에서 최종 문서를 리뷰한다.</desc>
+<defs><marker id="fb-p2-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<g class="cell codex swatch"><rect class="shape" x="16" y="169" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="199">Codex</text>
+<line class="rule" x1="16" y1="88" x2="1224" y2="88"/>
+<line class="rule" x1="16" y1="310" x2="1224" y2="310"/>
+<g class="cell ai swatch"><rect class="shape" x="16" y="477" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="507">Claude</text>
+<line class="rule" x1="16" y1="704" x2="1224" y2="704"/>
+<line class="rule" x1="80" y1="88" x2="80" y2="704"/>
+<path class="c" d="M320 334 L320 262" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M360 199 L424 199 Q432 199 432 207 L432 334" marker-end="url(#fb-p2-ah)"/>
+<path class="c back" d="M368 385 L360 385 Q352 385 352 377 L352 262" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M536 385 L624 385" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M452 436 L452 468"/>
+<path class="c" d="M680 334 L680 262" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M720 199 L864 199 Q872 199 872 207 L872 334" marker-end="url(#fb-p2-ah)"/>
+<path class="c back" d="M952 334 L952 124 Q952 116 944 116 L528 116 Q520 116 520 124 L520 136" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M972 436 L972 460 Q972 468 964 468 L244 468 Q236 468 236 476 L236 500" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M344 551 L376 551" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M592 551 L624 551" marker-end="url(#fb-p2-ah)"/>
+<path class="c back" d="M800 602 L800 660 Q800 668 792 668 L244 668 Q236 668 236 660 L236 602" marker-end="url(#fb-p2-ah)"/>
+<path class="c back" d="M824 602 L824 672 Q824 680 816 680 L112 680 Q104 680 104 672 L104 207 Q104 199 112 199 L128 199" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M840 551 L1104 551 Q1112 551 1112 543 L1112 262" marker-end="url(#fb-p2-ah)"/>
+<path class="c" d="M1024 136 L1024 104" marker-end="url(#fb-p2-ah)"/>
+<rect class="mask" x="360" y="270" width="60" height="36" rx="2"/>
+<text class="lbl" x="365" y="283">수정하면</text>
+<text class="lbl" x="365" y="301">→ 다시</text>
+<rect class="mask" x="540" y="341" width="64" height="36" rx="2"/>
+<text class="lbl" x="545" y="354">교차 검증</text>
+<text class="lbl" x="545" y="372">대상이면</text>
+<rect class="mask" x="462" y="442" width="88" height="18" rx="2"/>
+<text class="lbl" x="467" y="455">대상이 아니면</text>
+<rect class="mask" x="688" y="289" width="120" height="18" rx="2"/>
+<text class="lbl" x="693" y="302">결론 없이 검증 요청</text>
+<rect class="mask" x="528" y="90" width="412" height="18" rx="2"/>
+<text class="lbl" x="533" y="103">두 답이 불일치하면 → 근거와 통합안을 전달해 재질문한다(2~3회까지)</text>
+<rect class="mask" x="982" y="440" width="88" height="18" rx="2"/>
+<text class="lbl" x="987" y="453">대조를 마치면</text>
+<rect class="mask" x="562" y="642" width="228" height="18" rx="2"/>
+<text class="lbl" x="567" y="655">산문을 수정하면 → 어휘 대조부터 다시</text>
+<rect class="mask" x="834" y="610" width="256" height="18" rx="2"/>
+<text class="lbl" x="839" y="623">의미·범위가 바뀌면 → 독자 테스트부터 다시</text>
+<rect class="mask" x="850" y="525" width="164" height="18" rx="2"/>
+<text class="lbl" x="855" y="538">통과 → 마지막 독자 테스트</text>
+<rect class="mask" x="1032" y="95" width="160" height="18" rx="2"/>
+<text class="lbl" x="1037" y="108">다음 장: 3장 설계 문서 →</text>
+<g class="cell codex"><rect class="shape" x="128" y="136" width="232" height="126" rx="6"/><text class="title" x="140" y="160">독자 테스트</text><text class="sub" x="140" y="182">문서 사본만 보고 질문에 답한다</text><text class="sub" x="140" y="206">빠진 설명과 필요 없는 글을 찾는다</text><text class="sub" x="140" y="230">새 문서나 추가·삭제 합이 50줄 이상인</text><text class="sub" x="140" y="248">문서 대상</text></g>
+<g class="cell codex"><rect class="shape" x="488" y="136" width="232" height="126" rx="6"/><text class="title" x="500" y="160">Codex 독립 검증</text><text class="sub" x="500" y="182">Claude의 답을 모르는 채 같은 질문에</text><text class="sub" x="500" y="200">답한다</text></g>
+<g class="tag"><rect x="488" y="270" width="164" height="24"/><text x="496" y="287"><tspan class="num">①</tspan> <tspan class="tagname">codex-cross-check</tspan></text></g>
+<g class="cell codex"><rect class="shape" x="1000" y="136" width="224" height="126" rx="6"/><text class="title" x="1012" y="160">마지막 독자 테스트</text><text class="sub" x="1012" y="182">커밋 전에 마지막 수정본으로 한 번 더</text><text class="sub" x="1012" y="206">반영할 새 피드백이 없을 때까지 반복</text></g>
+<g class="cell ai"><rect class="shape" x="128" y="334" width="216" height="102" rx="6"/><text class="title" x="140" y="358">독자 테스트 준비</text><text class="sub" x="140" y="380">문서 사본만 둔 폴더를 생성한다</text><text class="sub" x="140" y="404">독자와 질문을 기록해 이전 맥락을</text><text class="sub" x="140" y="422">모르는 새 작업으로 요청한다</text></g>
+<g class="cell ai"><rect class="shape" x="368" y="334" width="168" height="102" rx="6"/><text class="title" x="380" y="358">실제 결함만 수정</text><text class="sub" x="380" y="380">교차 검증으로 결정한</text><text class="sub" x="380" y="398">피드백만 수정한다</text></g>
+<g class="cell ai"><rect class="shape" x="624" y="334" width="200" height="102" rx="6"/><text class="title" x="636" y="358">Claude 답·근거 기록</text><text class="sub" x="636" y="380">질문에 먼저 답한다</text><text class="sub" x="636" y="404">답과 근거를 파일에 기록한다</text></g>
+<g class="cell ai"><rect class="shape" x="856" y="334" width="232" height="102" rx="6"/><text class="title" x="868" y="358">두 답 대조·반영</text><text class="sub" x="868" y="380">항목별로 대조한다</text><text class="sub" x="868" y="404">맞는 반론만 반영한다</text></g>
+<g class="cell ai"><rect class="shape" x="128" y="500" width="216" height="102" rx="6"/><text class="title" x="140" y="524">어휘 대조</text><text class="sub" x="140" y="546">명사·동사·한자어 점검</text><text class="sub" x="140" y="570">보통 사용하는 말인지</text></g>
+<g class="cell ai"><rect class="shape" x="376" y="500" width="216" height="102" rx="6"/><text class="title" x="388" y="524">humanize 진단</text><text class="sub" x="388" y="546">AI 문체 패턴 검사</text><text class="sub" x="388" y="570">진단에 나온 곳만 수정</text></g>
+<g class="cell ai"><rect class="shape" x="624" y="500" width="216" height="102" rx="6"/><text class="title" x="636" y="524">렌더 확인</text><text class="sub" x="636" y="546">실제 크기로 렌더</text><text class="sub" x="636" y="570">크기가 정해진 문서는 잘림·겹침</text><text class="sub" x="636" y="588">측정</text></g>
+<g class="tag"><rect x="624" y="610" width="148" height="24"/><text x="632" y="627"><tspan class="num">②</tspan> <tspan class="tagname">render-check.js</tspan></text></g>
+<circle class="merge" cx="452" cy="468" r="4"/>
+</svg>
+<!-- ch2:end -->
+      </figure>
+      <!-- notes2:start -->
+<ol class="notes">
+<li><span class="num">①</span> <b>codex-cross-check</b><dl><dt>적용 시점</dt><dd>개발자가 교차 검증을 요구할 때, 개발자의 리뷰에 답할 때, 공개 문서나 중요한 설계 판단의 최종안을 제시할 때, 독자 테스트 피드백의 반영 여부를 결정할 때</dd><dt>역할</dt><dd><ul><li>Claude가 세션의 첫 호출 전에 Codex 모델과 추론 수준을 개발자에게 질문한다.</li><li>Claude가 Codex의 남은 사용량을 확인하고 이전 맥락을 모르는 새 작업으로 요청한다.</li><li>Claude가 항목마다 주고받은 내용을 요약해 답변에서만 보고한다. PR 댓글로 게시하지 않는다.</li></ul></dd></dl></li>
+<li><span class="num">②</span> <b>render-check.js</b><dl><dt>적용 시점</dt><dd>슬라이드처럼 크기가 정해진 문서를 렌더링해 확인할 때</dd><dt>역할</dt><dd>장마다 넘침·잘림·바닥 여백·겹침을 측정한다.</dd></dl></li>
+</ol>
+<!-- notes2:end -->
+    </section>
+
+    <section id="ch3">
+      <h2>3장 이해·토론과 드래프트 PR</h2>
+      <p>개발자가 설계 문서를 읽고 이해한 것만 구현으로 넘긴다. 이 관문을 둔 이유는 <a href="index.html">회고</a> 1장에 기록했다.</p>
+      <p>이해하지 못하면 개발자가 질문하고 Claude가 설명하거나 설계 문서를 수정한다. 개발자는 이해했는지 다시 확인하고 이해할 때까지 이 토론을 반복한다. 4·5장에서 설계 허점을 찾으면 이 토론으로 온다. 토론이 끝나면 원래 장으로 돌아간다.</p>
+      <p>이해하면 Claude가 빈 커밋으로 브랜치를 시작하고 드래프트 PR(작업 중이라 아직 병합하지 않는 PR)을 여는 명령을 제시한다. 개발자가 그 명령을 실행한다. 설계 문서를 처음 커밋하는 브랜치에서는 설계 문서가 빈 커밋 다음의 첫 커밋이 된다. 6장에서 돌아온 다음 브랜치는 빈 커밋 뒤에 바로 4장 RED로 간다.</p>
+      <p>구현이 여러 작업으로 나뉘면 설계 문서만 담은 이 브랜치를 먼저 병합하고 구현 브랜치를 새로 연다.</p>
+      <figure class="flow-b">
+        <!-- ch3:start -->
+<svg class="page" id="fb-p3" viewBox="0 64 1240 444" role="img" aria-labelledby="fb-p3-title fb-p3-desc">
+<title id="fb-p3-title">3장 설계 · 이해·토론과 드래프트 PR</title>
+<desc id="fb-p3-desc">3장. 검토와 렌더 확인을 마친 설계 문서를 개발자가 읽고 Claude와 토론한다. 개발자가 이해하지 못하면 질문하고 Claude가 설명하거나 설계 문서를 수정한다. 개발자는 이해했는지 다시 확인한다. 수정한 설계 문서는 커밋 전에 마지막 독자 테스트를 다시 거친다. 의미나 범위가 바뀌었으면 2장 독자 테스트부터 다시 진행한다. 4장·5장에서 설계 허점을 찾아도 이 토론으로 오고 토론이 끝나면 원래 장으로 돌아간다. 이해하면 Claude가 빈 커밋으로 브랜치를 시작하고 드래프트 PR을 먼저 여는 명령을 제시하고 개발자가 실행한다. 첫 브랜치에서는 그 뒤 개발자가 설계 문서를 커밋하고 4장 RED로 간다. 이 커밋이 빈 커밋 다음의 첫 커밋이다. 6장에서 돌아온 다음 브랜치는 빈 커밋 뒤에 바로 4장 RED로 간다. 구현이 여러 작업으로 나뉘면 이 브랜치를 먼저 병합하고 구현 브랜치를 새로 연다. 6장에서 브랜치를 병합한 뒤 다음 브랜치가 있으면 브랜치 명령부터 다시 진행한다.</desc>
+<defs><marker id="fb-p3-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<g class="cell ai swatch"><rect class="shape" x="16" y="165" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="195">Claude</text>
+<line class="rule" x1="16" y1="88" x2="1224" y2="88"/>
+<line class="rule" x1="16" y1="302" x2="1224" y2="302"/>
+<g class="cell dev swatch"><rect class="shape" x="16" y="365" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="395">개발자</text>
+<line class="rule" x1="16" y1="488" x2="1224" y2="488"/>
+<line class="rule" x1="80" y1="88" x2="80" y2="488"/>
+<path class="c" d="M200 222 L200 326" marker-end="url(#fb-p3-ah)"/>
+<path class="c" d="M336 326 L336 228" marker-end="url(#fb-p3-ah)"/>
+<path class="c back" d="M384 228 L384 326" marker-end="url(#fb-p3-ah)"/>
+<path class="c" d="M400 368 L520 368 Q528 368 528 360 L528 203 Q528 195 536 195 L544 195" marker-end="url(#fb-p3-ah)"/>
+<path class="c" d="M720 195 L728 195 Q736 195 736 203 L736 326" marker-end="url(#fb-p3-ah)"/>
+<path class="c back" d="M1224 100 L424 100 Q416 100 416 108 L416 144" marker-end="url(#fb-p3-ah)"/>
+<path class="c back" d="M1224 124 L640 124 Q632 124 632 132 L632 144" marker-end="url(#fb-p3-ah)"/>
+<path class="c" d="M800 395 L832 395" marker-end="url(#fb-p3-ah)"/>
+<path class="c" d="M1064 395 L1096 395" marker-end="url(#fb-p3-ah)"/>
+<rect class="mask" x="228" y="268" width="100" height="18" rx="2"/>
+<text class="lbl" x="233" y="281">이해하지 못하면</text>
+<rect class="mask" x="408" y="376" width="60" height="18" rx="2"/>
+<text class="lbl" x="413" y="389">이해하면</text>
+<rect class="mask" x="940" y="74" width="284" height="18" rx="2"/>
+<text class="lbl" x="945" y="87">4·5장에서 설계 허점이면 → 토론 뒤 원래 장으로</text>
+<rect class="mask" x="1028" y="132" width="196" height="18" rx="2"/>
+<text class="lbl" x="1033" y="145">6장에서 병합한 뒤 다음 브랜치면</text>
+<rect class="mask" x="1104" y="386" width="136" height="18" rx="2"/>
+<text class="lbl" x="1109" y="399">다음 장: 4장 RED →</text>
+<g class="cell art"><path class="shape" d="M128 144 H258 L272 158 V222 H128 Z"/><path class="fold" d="M258 144 V158 H272"/><text class="title" x="140" y="168">설계 문서</text><text class="sub" x="140" y="190">검토와 렌더 확인을</text><text class="sub" x="140" y="208">마친 문서</text></g>
+<g class="cell ai"><rect class="shape" x="320" y="144" width="192" height="84" rx="6"/><text class="title" x="332" y="168">설명·설계 문서 수정</text><text class="sub" x="332" y="190">개발자의 질문에 답한다</text><text class="sub" x="332" y="214">필요하면 설계 문서를 수정한다</text></g>
+<g class="cell ai"><rect class="shape" x="544" y="144" width="176" height="102" rx="6"/><text class="title" x="556" y="168">브랜치·드래프트 PR</text><text class="title" x="556" y="186">명령 제시</text><text class="sub" x="556" y="208">빈 커밋으로 브랜치 시작</text><text class="sub" x="556" y="232">드래프트 PR을 먼저 연다</text></g>
+<g class="tag"><rect x="544" y="254" width="136" height="24"/><text x="552" y="271"><tspan class="num">①</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="128" y="326" width="272" height="84" rx="6"/><text class="title" x="140" y="350">이해·토론</text><text class="sub" x="140" y="372">설계 문서를 읽고 질문한다</text><text class="sub" x="140" y="396">이해했는지 확인한다</text></g>
+<text class="memo" x="128" y="424">수정한 설계 문서는 커밋 전에 마지막 독자</text>
+<text class="memo" x="128" y="442">테스트를 다시 거친다. 의미나 범위가 바뀌었으면</text>
+<text class="memo" x="128" y="460">2장 독자 테스트부터 다시 진행한다.</text>
+<g class="cell dev"><rect class="shape" x="672" y="326" width="128" height="138" rx="6"/><text class="title" x="684" y="350">실행</text><text class="sub" x="684" y="372">추천 명령 실행</text></g>
+<g class="cell dev"><rect class="shape" x="832" y="326" width="232" height="138" rx="6"/><text class="title" x="844" y="350">설계 문서 첫 커밋</text><text class="sub" x="844" y="372">첫 브랜치에서만. 다음 브랜치는 바로</text><text class="sub" x="844" y="390">4장 RED</text><text class="sub" x="844" y="414">구현이 여러 작업으로 나뉘면 이</text><text class="sub" x="844" y="432">브랜치를 먼저 병합하고 구현 브랜치를</text><text class="sub" x="844" y="450">새로 연다</text></g>
+</svg>
+<!-- ch3:end -->
+      </figure>
+      <!-- notes3:start -->
+<ol class="notes">
+<li><span class="num">①</span> <code>stop-check.py</code><dl><dt>적용 시점</dt><dd>Claude가 답변을 끝내기 전</dd><dt>차단 대상</dt><dd>답변의 추천 명령이 아래에 해당하면 답변을 반려한다.<ul><li>이번 턴에 상태 확인 명령(git status·log·diff·branch·rev-parse, gh pr view·list·status)을 하나도 실행하지 않고 스테이징·커밋·푸시·PR 명령을 제시했다.</li><li>이번 턴의 마지막 테스트가 실패했는데 스테이징·커밋·푸시·PR 명령을 제시했다. 빈 커밋 명령은 제외한다.</li><li>현재 대화에서 수정한 문서를 새 파일이나 추가·삭제 합 50줄 이상으로 커밋하는데 마지막 수정 뒤에 그 문서의 독자 테스트를 끝까지 실행하지 않았다.</li><li>커밋 메시지에 「검토:」 줄이 있는데 같은 명령 블록에 PR 댓글 주소가 없다.</li><li>PR 댓글을 게시하고 커밋 명령을 제시했는데 git push 블록이 없다.</li><li>개발자에게 cat·grep 같은 조회 명령으로 시작하는 블록을 제시했다.</li></ul></dd><dt>검사 생략 조건</dt><dd>개발자가 마지막 메시지나 그 뒤 질문 창 답에 「독자 테스트 생략」을 별도의 한 줄로 기록하면 독자 테스트 확인을 생략한다.</dd></dl></li>
+</ol>
+<!-- notes3:end -->
+    </section>
+
+    <section id="ch4">
+      <h2>4장 TDD 사이클과 리뷰</h2>
+      <p>Claude가 RED와 GREEN을 이어서 진행하고 체크포인트 보고를 제시한다. 보고의 커밋 명령은 테스트만 담은 RED 커밋과 구현을 추가한 GREEN 커밋으로 나뉜다. 개발자는 사이클이 끝날 때마다 한 번 리뷰한다. 브랜치의 마지막 사이클을 커밋하면 Claude가 설계 문서와 README 같은 저장소 문서를 한 번에 갱신하고 5장 인수 확인으로 간다.</p>
+      <p>피드백이 오면 Claude는 방향이 바뀌었는지 먼저 판단한다. 개발자의 반박으로 Claude의 결정이 바뀌면 방향이 바뀐 것이다. 피드백에 따라 아래 순서로 진행한다.</p>
+      <table>
+        <thead><tr><th>피드백</th><th>순서</th></tr></thead>
+        <tbody>
+          <tr><td>방향 유지</td><td>Claude 수정 → 체크포인트 보고 → 개발자 리뷰·커밋</td></tr>
+          <tr><td>방향 변경</td><td>개발자가 쌓인 커밋 푸시 → Claude가 PR 댓글 작성 → Claude 수정 → 체크포인트 보고 → 개발자 리뷰·커밋·푸시</td></tr>
+        </tbody>
+      </table>
+      <p>댓글이 없는 커밋은 모아 두었다가 다음 PR 댓글을 게시하기 전이나 병합하기 전에 푸시한다.</p>
+      <p>개발자가 여러 항목의 리뷰를 전달하면서 수정하라고 하지 않았으면 Claude는 항목마다 수용 여부와 변경 내용을 먼저 답한다. 개발자가 확인한 뒤에 수정한다.</p>
+      <figure class="flow-b">
+        <!-- ch4:start -->
+<svg class="page" id="fb-p4" viewBox="0 64 1240 736" role="img" aria-labelledby="fb-p4-title fb-p4-desc">
+<title id="fb-p4-title">4장 구현 · TDD 사이클과 리뷰</title>
+<desc id="fb-p4-desc">4장. 3장에서 브랜치를 연 뒤에 이 장이 시작된다. Claude가 RED와 GREEN을 이어서 진행하고 GREEN에서 멈춰 체크포인트 보고를 제시한다. 개발자가 사이클마다 한 번 리뷰한다. 통과하면 개발자가 커밋하고 PR 댓글이 있는 보고면 푸시까지 진행한다. 브랜치의 마지막 사이클이 아니면 다음 사이클 RED로 간다. 마지막 사이클이면 Claude가 브랜치의 사이클을 한 번에 반영해 설계 문서와 README 같은 저장소 문서를 갱신한다. 그 뒤 5장 인수 확인으로 간다. 문서 갱신의 [Docs] 커밋 명령은 5장 체크포인트 보고에 들어간다. 리뷰에서 설계 허점을 찾으면 3장 토론으로 간다. 미통과로 수정을 요청받으면 Claude가 PR 댓글 작성 여부를 먼저 판단한다. 5장 리뷰에서 나온 피드백도 여기로 온다. 방향이 바뀌면 개발자가 쌓인 커밋을 먼저 푸시하고 Claude가 PR 댓글을 게시한 뒤 수정한다. 방향을 유지하면 피드백 반영 수정이나 REFACTOR를 진행한다. 5장 인수 확인에서 온 수정이면 5장으로 돌아가 인수 확인을 다시 진행한다. 아니면 체크포인트 보고로 돌아가 다시 리뷰를 받는다. 방향이 바뀐 보고의 커밋 명령에는 검토 줄과 댓글 주소, 푸시 명령이 추가된다.</desc>
+<defs><marker id="fb-p4-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<text class="stage" x="160" y="104">TDD 사이클</text>
+<text class="stage" x="488" y="104">리뷰</text>
+<text class="stage" x="784" y="104">피드백 반영</text>
+<line class="rule" x1="420" y1="112" x2="420" y2="704"/>
+<line class="rule" x1="748" y1="112" x2="748" y2="704"/>
+<path class="c" d="M284 208 L284 240" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M368 300 L368 364" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M408 427 L424 427 Q432 427 432 419 L432 162 Q432 154 440 154 L488 154" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M612 184 L612 228" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M612 304 L612 352" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M612 436 L612 480" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M612 556 L612 600" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M688 266 L752 266 Q760 266 760 258 L760 162 Q760 154 768 154 L880 154" marker-end="url(#fb-p4-ah)"/>
+<path class="c back" d="M1224 100 L1072 100 Q1064 100 1064 108 L1064 124" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M1088 184 L1088 230 Q1088 238 1080 238 L1012 238 Q1004 238 1004 246 L1004 260" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M916 298 L896 298 Q888 298 888 306 L888 388" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M1092 298 L1112 298 Q1120 298 1120 306 L1120 388" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M928 484 L928 608" marker-end="url(#fb-p4-ah)"/>
+<path class="c" d="M1184 496 L1184 568 Q1184 576 1176 576 L928 576"/>
+<path class="c back" d="M928 684 L928 716 Q928 724 920 724 L352 724 Q344 724 344 716 L344 490" marker-end="url(#fb-p4-ah)"/>
+<path class="c back" d="M708 518 L720 518 Q728 518 728 526 L728 732 Q728 740 720 740 L32 740 Q24 740 24 732 L24 174 Q24 166 32 166 L160 166" marker-end="url(#fb-p4-ah)"/>
+<path class="c back" d="M488 651 L464 651 Q456 651 456 659 L456 691" marker-end="url(#fb-p4-ah)"/>
+<path class="c back" d="M536 266 L464 266 Q456 266 456 274 L456 306" marker-end="url(#fb-p4-ah)"/>
+<path class="c back" d="M1048 646 L1100 646 Q1108 646 1108 654 L1108 686" marker-end="url(#fb-p4-ah)"/>
+<rect class="mask" x="622" y="319" width="36" height="18" rx="2"/>
+<text class="lbl" x="627" y="332">통과</text>
+<rect class="mask" x="490" y="564" width="112" height="18" rx="2"/>
+<text class="lbl" x="495" y="577">맞다 → 문서 갱신</text>
+<rect class="mask" x="770" y="192" width="64" height="36" rx="2"/>
+<text class="lbl" x="775" y="205">미통과 ·</text>
+<text class="lbl" x="775" y="223">수정 요청</text>
+<rect class="mask" x="1072" y="74" width="152" height="18" rx="2"/>
+<text class="lbl" x="1077" y="87">5장 리뷰에서 피드백이면</text>
+<rect class="mask" x="814" y="306" width="64" height="18" rx="2"/>
+<text class="lbl" x="819" y="319">방향 유지</text>
+<rect class="mask" x="1130" y="306" width="88" height="18" rx="2"/>
+<text class="lbl" x="1135" y="319">방향이 바뀌면</text>
+<rect class="mask" x="958" y="544" width="216" height="18" rx="2"/>
+<text class="lbl" x="963" y="557">커밋 명령에 검토 줄 · 푸시 명령 추가</text>
+<rect class="mask" x="758" y="692" width="160" height="18" rx="2"/>
+<text class="lbl" x="763" y="705">아니다 → 체크포인트 보고</text>
+<rect class="mask" x="712" y="492" width="168" height="18" rx="2"/>
+<text class="lbl" x="717" y="505">아니다 → 다음 사이클 RED</text>
+<rect class="mask" x="440" y="699" width="32" height="18" rx="2"/>
+<text class="lbl" x="445" y="712">5장</text>
+<rect class="mask" x="370" y="625" width="108" height="18" rx="2"/>
+<text class="lbl" x="375" y="638">→ 5장 인수 확인</text>
+<rect class="mask" x="440" y="314" width="32" height="18" rx="2"/>
+<text class="lbl" x="445" y="327">3장</text>
+<rect class="mask" x="442" y="222" width="88" height="36" rx="2"/>
+<text class="lbl" x="447" y="235">설계 허점이면</text>
+<text class="lbl" x="447" y="253">→ 3장 토론</text>
+<rect class="mask" x="1092" y="694" width="32" height="18" rx="2"/>
+<text class="lbl" x="1097" y="707">5장</text>
+<rect class="mask" x="1052" y="620" width="164" height="18" rx="2"/>
+<text class="lbl" x="1057" y="633">맞다 → 5장 인수 확인 다시</text>
+<rect class="bridge-cut" x="722" y="721" width="12" height="6"/><path class="bridge" d="M728 721 V727"/><path class="bridge" d="M722 724 A6 6 0 0 1 734 724"/>
+<g class="cell ai"><rect class="shape" x="160" y="124" width="248" height="84" rx="6"/><text class="title" x="172" y="148">RED</text><text class="sub" x="172" y="170">실패하는 테스트 하나</text><text class="sub" x="172" y="194">실패 확인</text></g>
+<g class="cell ai"><rect class="shape" x="160" y="240" width="248" height="60" rx="6"/><text class="title" x="172" y="264">GREEN</text><text class="sub" x="172" y="286">그 테스트를 통과시키는 최소 구현</text></g>
+<g class="tag"><rect x="160" y="308" width="192" height="24"/><text x="168" y="325"><tspan class="num">①</tspan> <tspan class="mono">commit-checkpoint.py</tspan></text></g>
+<g class="cell ai"><rect class="shape" x="160" y="364" width="248" height="126" rx="6"/><text class="title" x="172" y="388">체크포인트 보고</text><text class="sub" x="172" y="410">작업 내역·진행 표</text><text class="sub" x="172" y="434">경로를 명시한 스테이징</text><text class="sub" x="172" y="458">단계별 추천 커밋 명령 [Test]·[Feat]·</text><text class="sub" x="172" y="476">[Refactor]</text></g>
+<g class="tag"><rect x="160" y="498" width="128" height="24"/><text x="168" y="515"><tspan class="num">②</tspan> <tspan class="mono">git-guard.py</tspan></text></g>
+<g class="tag"><rect x="160" y="530" width="136" height="24"/><text x="168" y="547"><tspan class="num">③</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="488" y="124" width="248" height="60" rx="6"/><text class="title" x="500" y="148">리뷰</text><text class="sub" x="500" y="170">사이클이 끝난 뒤 한 번</text></g>
+<g class="cell dev decision"><path class="shape" d="M612 228 L688 266 L612 304 L536 266 Z"/><text class="dtitle" x="612" y="271" text-anchor="middle">통과인가</text></g>
+<g class="cell dev"><rect class="shape" x="488" y="352" width="248" height="84" rx="6"/><text class="title" x="500" y="376">커밋</text><text class="sub" x="500" y="398">추천 명령으로 단계별 커밋</text><text class="sub" x="500" y="422">PR 댓글이 있는 보고면 푸시까지</text></g>
+<g class="cell ai decision"><path class="shape" d="M612 480 L708 518 L612 556 L516 518 Z"/><text class="dtitle" x="612" y="523" text-anchor="middle">마지막 사이클인가</text></g>
+<g class="cell ai"><rect class="shape" x="488" y="600" width="224" height="102" rx="6"/><text class="title" x="500" y="624">문서 갱신</text><text class="sub" x="500" y="646">설계 문서·README 에 한 번에</text><text class="sub" x="500" y="664">반영한다</text><text class="sub" x="500" y="688">[Docs] 커밋 명령은 5장 보고에서</text></g>
+<g class="cell ai"><rect class="shape" x="880" y="124" width="248" height="60" rx="6"/><text class="title" x="892" y="148">PR 댓글 작성 여부 판단</text><text class="sub" x="892" y="170">방향이 바뀌었는지 먼저 결정한다</text></g>
+<g class="tag"><rect x="880" y="192" width="136" height="24"/><text x="888" y="209"><tspan class="num">④</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell ai decision"><path class="shape" d="M1004 260 L1092 298 L1004 336 L916 298 Z"/><text class="dtitle" x="1004" y="303" text-anchor="middle">방향이 바뀌었나</text></g>
+<g class="cell ai"><rect class="shape" x="784" y="388" width="208" height="96" rx="6"/><text class="title" x="796" y="412">피드백 반영 수정 ·</text><text class="title" x="796" y="430">REFACTOR</text><text class="sub" x="796" y="452">구조·중복 피드백이면</text><text class="sub" x="796" y="470">REFACTOR</text></g>
+<g class="cell ai"><rect class="shape" x="1016" y="388" width="208" height="108" rx="6"/><text class="title" x="1028" y="412">반영 수정 · PR 댓글 작성</text><text class="sub" x="1028" y="434">쌓인 커밋이 있으면 푸시 명령부터</text><text class="sub" x="1028" y="458">바뀐 결정을 다섯 줄로 요약</text><text class="sub" x="1028" y="482">바뀐 방향으로 수정</text></g>
+<g class="tag"><rect x="1016" y="504" width="128" height="24"/><text x="1024" y="521"><tspan class="num">⑤</tspan> <tspan class="mono">git-guard.py</tspan></text></g>
+<g class="cell ai decision"><path class="shape" d="M928 608 L1048 646 L928 684 L808 646 Z"/><text class="dtitle" x="928" y="651" text-anchor="middle">인수 확인에서 온 수정인가</text></g>
+<circle class="merge" cx="928" cy="576" r="4"/>
+<line class="rule" x1="16" y1="766" x2="1224" y2="766"/>
+<g class="cell ai swatch"><rect class="shape" x="16" y="773" width="14" height="14" rx="3"/></g><text class="legend" x="38" y="784">Claude</text>
+<g class="cell dev swatch"><rect class="shape" x="136" y="773" width="14" height="14" rx="3"/></g><text class="legend" x="158" y="784">개발자</text>
+<path class="swatch-decision" d="M271 773 L278 780 L271 787 L264 780 Z"/><text class="legend" x="286" y="784">판단</text>
+<circle class="merge" cx="375" cy="780" r="4"/><text class="legend" x="390" y="784">갈래가 다시 만나는 곳</text>
+</svg>
+<!-- ch4:end -->
+      </figure>
+      <!-- notes4:start -->
+<ol class="notes">
+<li><span class="num">①</span> <code>commit-checkpoint.py</code><dl><dt>적용 시점</dt><dd>Claude가 셸 명령을 실행한 직후</dd><dt>알림 내용</dt><dd>Claude가 실행한 테스트·빌드가 통과했는데 이번 세션에서 수정한 파일이 커밋되지 않고 남으면 다음 사이클 RED 대신 체크포인트 보고를 제시하라고 Claude에게 지시한다.</dd></dl></li>
+<li><span class="num">②</span> <code>git-guard.py</code><dl><dt>적용 시점</dt><dd>Claude가 셸 명령을 실행하기 전</dd><dt>차단 대상</dt><dd>git add -A, git add --all, git add . 을 차단한다.</dd></dl></li>
+<li><span class="num">③</span> <code>stop-check.py</code>: 체크포인트 보고의 스테이징·커밋 명령을 검사한다. 이번 턴의 마지막 테스트가 실패했거나 상태 확인 명령을 실행하지 않았으면 답변을 반려한다. 전체 조건은 3장 ①에 있다.</li>
+<li><span class="num">④</span> <code>stop-check.py</code><dl><dt>적용 시점</dt><dd>Claude가 커밋 명령을 제시한 뒤 받은 요청에 답변을 끝내기 전</dd><dt>차단 대상</dt><dd>PR 댓글 작성 여부를 판단하지 않은 답변을 반려한다. 판단 여부는 답변에 「댓글」이라는 말이 있는지나 댓글을 게시했는지로 확인한다.</dd></dl></li>
+<li><span class="num">⑤</span> <code>git-guard.py</code><dl><dt>적용 시점</dt><dd>Claude가 PR 댓글을 게시하기 전</dd><dt>차단 대상</dt><dd>아래에 해당하면 댓글 게시를 차단한다.<ul><li>푸시하지 않은 커밋이 있다.</li><li>「변경 파일:」 줄에 없는 추적 파일에 커밋하지 않은 변경이 있다.</li><li>「교차 검증 지적:」 줄이 있다.</li><li>「사용자 피드백:」 줄이 둘 이상이다.</li><li>결정 항목 줄 하나에 문장이 둘 이상이다.</li></ul></dd></dl></li>
+<li><b>개발자 커밋</b>: 개발자가 실행하는 명령에는 훅이 적용되지 않는다. 명령은 체크포인트 보고에서 검사를 거쳤다.</li>
+<li><b>PR 댓글 규칙</b><ul><li>Claude가 gh pr comment 로 게시한다.</li><li>댓글을 게시하기 전에 개발자가 쌓인 커밋을 먼저 푸시한다. 쌓인 커밋을 댓글 뒤에 함께 푸시하면 모두 댓글 아래에 붙어 어느 커밋이 결정을 반영했는지 구분할 수 없다.</li><li>댓글 뒤의 수정 커밋은 푸시까지 진행한다. 그래야 PR 타임라인에서 댓글 아래에 그 커밋이 붙는다.</li><li>댓글이 없는 커밋은 모아 두었다가 다음 PR 댓글을 게시하기 전이나 병합하기 전에 푸시한다.</li><li>첫 줄에는 어느 작업에서 나온 피드백인지 기록한다. 그 아래는 다섯 줄이다: 1차 AI 결정 / 사용자 피드백 / 2차 AI 결정(피드백 반영) / 2차 AI 결정 근거 / 변경 파일.</li><li>줄마다 한 문장으로 작성하고 변경 파일은 이름만 기록한다.</li><li>피드백이 여러 건이면 건마다 따로 게시한다.</li><li>댓글로 게시한 결정이 다시 바뀌면 후속 댓글을 게시한다. 첫 줄에는 어느 결정이 바뀌었는지 기록하고 그 아래는 다섯 줄이다: 직전 결정 / 다시 바뀐 계기 / 새 결정 / 새 결정 근거 / 변경 파일.</li><li>방향을 바꾼 커밋은 메시지 본문 첫 줄을 「검토:」로 시작해 무엇이 어떻게 바뀌었는지 기록하고 댓글 주소를 추가한다.</li><li>개발자가 Claude가 제시한 선택지를 고른 것은 댓글로 게시하지 않는다. 다만 앞서 댓글로 게시한 결정이 다시 바뀌면 게시한다.</li><li>Codex 교차 검증 결과는 댓글로 게시하지 않는다.</li></ul></li>
+</ol>
+<!-- notes4:end -->
+    </section>
+
+    <section id="ch5">
+      <h2>5장 인수 확인</h2>
+      <p>문서 갱신까지 마치면 Claude가 앱을 기동해 운영과 같은 경로로 호출한다. 정상·경계·거부·오류 응답을 모두 확인하고 결과를 체크포인트 보고에 항목별로 기록한다. 개발자가 리뷰해 통과하면 커밋하고 6장으로 간다.</p>
+      <p>피드백이면 4장에서 수정한다. 수정한 뒤 커밋하기 전에 이 장으로 돌아와 인수 확인을 다시 진행한다. 설계 허점이면 3장 토론으로 간다.</p>
+      <figure class="flow-b">
+        <!-- ch5:start -->
+<svg class="page" id="fb-p5" viewBox="0 64 1240 534" role="img" aria-labelledby="fb-p5-title fb-p5-desc">
+<title id="fb-p5-title">5장 인수 확인 · 앱 기동과 결과 리뷰</title>
+<desc id="fb-p5-desc">5장. 문서 갱신까지 마치면 Claude가 앱을 기동한다. JVM 프로젝트에서 IDEA 디버거 도구를 사용할 수 있으면 IntelliJ 디버거로 기동하고 아니면 일반 기동한다. DB 와 외부 의존은 일회용 컨테이너로 기동한다. HTTP·CLI 로 정상·경계·거부·오류 응답을 호출한다. 디버거로 기동했으면 로그포인트·중단점으로 테스트가 단언하지 않는 값도 확인하고 개발자는 같은 과정을 IntelliJ 화면에서 나란히 확인한다. 끝나면 프로세스와 컨테이너를 정지한다. Claude가 인수 확인 결과를 항목별로 기록한 체크포인트 보고를 제시하고 개발자가 리뷰한다. 체크포인트 보고에는 4장에서 갱신한 문서의 [Docs] 커밋 명령도 들어간다. 통과하면 커밋하고 6장 전체 검토로 간다. 브랜치 하나가 작업 하나를 담으므로 인수 확인 뒤에 남은 사이클은 없다. 피드백이면 4장 PR 댓글 작성 여부 판단으로 간다. 설계 허점을 찾으면 3장 토론으로 간다. 피드백을 반영하면 커밋하기 전에 5장으로 돌아와 인수 확인을 다시 진행한다. 그 뒤 체크포인트 보고와 리뷰를 거쳐 커밋한다.</desc>
+<defs><marker id="fb-p5-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<g class="cell ai swatch"><rect class="shape" x="16" y="195" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="225">Claude</text>
+<line class="rule" x1="16" y1="88" x2="1224" y2="88"/>
+<line class="rule" x1="16" y1="362" x2="1224" y2="362"/>
+<g class="cell dev swatch"><rect class="shape" x="16" y="440" width="14" height="14" rx="3"/></g><text class="lane-name" x="16" y="470">개발자</text>
+<line class="rule" x1="16" y1="578" x2="1224" y2="578"/>
+<line class="rule" x1="80" y1="88" x2="80" y2="578"/>
+<path class="c" d="M336 193 L368 193" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M552 193 L584 193" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M752 193 L784 193" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M912 193 L944 193" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M604 437 L640 437" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M1100 274 L1100 366 Q1100 374 1092 374 L536 374 Q530 374 530 380 L530 386" marker-end="url(#fb-p5-ah)"/>
+<path class="c back" d="M128 193 L120 193 Q112 193 112 201 L112 429 Q112 437 120 437 L128 437"/>
+<path class="c back" d="M505 488 L505 528" marker-end="url(#fb-p5-ah)"/>
+<path class="c back" d="M555 488 L555 528" marker-end="url(#fb-p5-ah)"/>
+<path class="c" d="M848 437 L880 437" marker-end="url(#fb-p5-ah)"/>
+<rect class="mask" x="604" y="411" width="36" height="18" rx="2"/>
+<text class="lbl" x="609" y="424">통과</text>
+<rect class="mask" x="489" y="536" width="32" height="18" rx="2"/>
+<text class="lbl" x="494" y="549">4장</text>
+<rect class="mask" x="243" y="496" width="252" height="18" rx="2"/>
+<text class="lbl" x="248" y="509">피드백이면 → 4장 PR 댓글 작성 여부 판단</text>
+<rect class="mask" x="539" y="536" width="32" height="18" rx="2"/>
+<text class="lbl" x="544" y="549">3장</text>
+<rect class="mask" x="565" y="496" width="160" height="18" rx="2"/>
+<text class="lbl" x="570" y="509">설계 허점이면 → 3장 토론</text>
+<rect class="mask" x="888" y="428" width="160" height="18" rx="2"/>
+<text class="lbl" x="893" y="441">다음 장: 6장 전체 검토 →</text>
+<g class="cell ai"><rect class="shape" x="128" y="112" width="208" height="162" rx="6"/><text class="title" x="140" y="136">IntelliJ 디버거로 앱 기동</text><text class="sub" x="140" y="158">JVM 프로젝트에서 IDEA 디버거</text><text class="sub" x="140" y="176">도구를 사용할 수 있을 때. 아니면</text><text class="sub" x="140" y="194">일반 기동</text><text class="sub" x="140" y="218">개발자가 보는 IDE 화면에</text><text class="sub" x="140" y="236">Claude 작업 표시</text><text class="sub" x="140" y="260">DB·외부 의존은 일회용 컨테이너</text></g>
+<g class="tag"><rect x="128" y="282" width="116" height="24"/><text x="136" y="299"><tspan class="num">①</tspan> <tspan class="tagname">ij-debugger</tspan></text></g>
+<g class="cell ai"><rect class="shape" x="368" y="112" width="184" height="162" rx="6"/><text class="title" x="380" y="136">HTTP·CLI 호출</text><text class="sub" x="380" y="158">정상·경계·거부·오류 응답</text></g>
+<g class="cell ai"><rect class="shape" x="584" y="112" width="168" height="162" rx="6"/><text class="title" x="596" y="136">로그포인트·중단점</text><text class="sub" x="596" y="158">디버거로 기동했을 때</text><text class="sub" x="596" y="182">테스트가 단언하지 않는</text><text class="sub" x="596" y="200">값·분기</text></g>
+<g class="cell ai"><rect class="shape" x="784" y="112" width="128" height="162" rx="6"/><text class="title" x="796" y="136">정지</text><text class="sub" x="796" y="158">프로세스·컨테이너</text></g>
+<g class="cell ai"><rect class="shape" x="944" y="112" width="280" height="162" rx="6"/><text class="title" x="956" y="136">체크포인트 보고</text><text class="sub" x="956" y="158">인수 확인 결과를 항목별로</text><text class="sub" x="956" y="182">호출한 주소·응답 코드·본문</text><text class="sub" x="956" y="206">디버거로 본 값</text><text class="sub" x="956" y="230">경로를 명시한 스테이징</text><text class="sub" x="956" y="254">[Docs]·수정 커밋 명령</text></g>
+<g class="tag"><rect x="944" y="282" width="128" height="24"/><text x="952" y="299"><tspan class="num">②</tspan> <tspan class="mono">git-guard.py</tspan></text></g>
+<g class="tag"><rect x="944" y="314" width="136" height="24"/><text x="952" y="331"><tspan class="num">③</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="128" y="386" width="296" height="102" rx="6"/><text class="title" x="140" y="410">IntelliJ 화면 확인</text><text class="sub" x="140" y="432">디버거로 기동했을 때</text><text class="sub" x="140" y="456">Claude가 기동부터 정지까지 진행하는 인수 확인</text><text class="sub" x="140" y="474">과정을 IDE 화면에서 직접 확인</text></g>
+<g class="cell dev"><rect class="shape" x="456" y="386" width="148" height="102" rx="6"/><text class="title" x="468" y="410">리뷰</text><text class="sub" x="468" y="432">인수 확인 결과와 코드</text><text class="sub" x="468" y="450">검토</text></g>
+<g class="cell dev"><rect class="shape" x="640" y="386" width="208" height="102" rx="6"/><text class="title" x="652" y="410">커밋</text><text class="sub" x="652" y="432">추천 명령으로 단계별 커밋</text><text class="sub" x="652" y="456">PR 댓글이 있는 보고면 푸시까지</text></g>
+</svg>
+<!-- ch5:end -->
+      </figure>
+      <!-- notes5:start -->
+<ol class="notes">
+<li><span class="num">①</span> <b>ij-debugger</b><dl><dt>적용 시점</dt><dd>JVM 프로젝트의 앱을 IntelliJ IDEA 디버거로 기동해 확인할 때</dd><dt>역할</dt><dd>IDEA 디버그 실행·로그포인트·중단점으로 실제로 흐른 값과 분기를 확인한다. 로그포인트는 실행을 멈추지 않고 값만 기록하는 중단점이다. 디버거 도구가 없으면 Claude가 그 사실을 먼저 알린다.</dd></dl></li>
+<li><span class="num">②</span> <code>git-guard.py</code><dl><dt>적용 시점</dt><dd>Claude가 셸 명령을 실행하기 전</dd><dt>차단 대상</dt><dd>git add -A, git add --all, git add . 을 차단한다.</dd></dl></li>
+<li><span class="num">③</span> <code>stop-check.py</code>: 인수 확인 보고의 [Docs]·수정 커밋 명령을 검사한다. 새 문서나 크게 수정한 문서를 커밋하는데 마지막 수정 뒤에 독자 테스트를 실행하지 않았으면 답변을 반려한다. 전체 조건은 3장 ①에 있다.</li>
+</ol>
+<!-- notes5:end -->
+    </section>
+
+    <section id="ch6">
+      <h2>6장 전체 검토·반영·병합</h2>
+      <p>인수 확인을 통과한 브랜치를 Claude 리뷰와 개발자 자체 리뷰로 따로 검토한다. 개발자가 두 결과를 대조해 반영할 피드백을 결정한다. 반영할 피드백이 있으면 Claude가 반영하고 5장 절차로 인수 확인을 다시 진행한 뒤 리뷰를 받는다. 반영할 피드백이 없거나 리뷰를 통과하면 Claude가 PR 본문을 작성한다. 개발자가 스쿼시로 병합한다.</p>
+      <p>남은 작업이 있으면 3장으로 돌아가 새 브랜치를 연다. 남은 작업이 없으면 설계 문서가 다룬 기능 전체를 Claude와 개발자가 각각 검토한다. 개발자가 두 결과를 대조해 반영할 피드백을 결정한다. 반영할 피드백이 있으면 3장에서 새 브랜치를 열어 수정한다.</p>
+      <figure class="flow-b">
+        <!-- ch6:start -->
+<svg class="page" id="fb-p6" viewBox="0 64 1240 748" role="img" aria-labelledby="fb-p6-title fb-p6-desc">
+<title id="fb-p6-title">6장 전체 검토·반영·병합</title>
+<desc id="fb-p6-desc">6장. 인수 확인을 통과한 브랜치를 두고 Claude 리뷰와 개발자의 자체 리뷰를 나란히 진행한다. 개발자가 두 리뷰 결과를 대조해 반영할 피드백을 결정한다. 반영할 피드백이 없으면 Claude가 곧바로 PR 본문과 병합 명령을 제시한다. 반영할 피드백이 있으면 대조 결과를 받는 것도 요청이라 Claude가 PR 댓글 작성 여부를 먼저 판단하고 필요하면 작성한다. Claude가 개발자가 결정한 피드백을 반영하고 5장 절차로 인수 확인을 다시 진행한 뒤 체크포인트 보고를 제시한다. 개발자가 리뷰해 미통과로 수정을 요청하면 PR 댓글 작성 여부 판단으로 돌아간다. 통과하면 추천 명령으로 커밋하고 병합 전에 쌓인 커밋까지 푸시한다. Claude가 작업 내용, 검토에서 바뀐 것, 인수 확인 결과를 담은 PR 본문을 작성하고 드래프트 해제·스쿼시 병합 명령을 제시한다. 개발자가 실행하면 이 브랜치가 병합된다. 다음 브랜치가 있으면 3장 브랜치 명령으로 돌아간다. 없으면 설계 문서가 다룬 기능 전체를 Claude와 개발자가 각각 검토하고 개발자가 두 결과를 대조한다. 반영할 피드백이 있으면 3장에서 새 브랜치를 열고 없으면 끝난다.</desc>
+<defs><marker id="fb-p6-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+<text class="stage" x="32" y="100">전체 검토</text>
+<text class="stage" x="412" y="100">반영</text>
+<text class="stage" x="702" y="100">리뷰</text>
+<text class="stage" x="950" y="100">병합</text>
+<line class="rule" x1="382" y1="128" x2="382" y2="766"/>
+<line class="rule" x1="688" y1="128" x2="688" y2="766"/>
+<line class="rule" x1="921" y1="128" x2="921" y2="766"/>
+<path class="c" d="M192 196 L192 268" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M296 196 L296 268" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M200 328 L200 372" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M300 410 L388 410 Q396 410 396 402 L396 204 Q396 196 404 196 L412 196" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M100 410 L28 410 Q20 410 20 402 L20 124 Q20 116 28 116 L1058 116 Q1066 116 1066 124 L1066 136" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M620 256 L620 328" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M536 412 L536 452" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M660 506 L667 506 Q674 506 674 499 L674 238 Q674 230 682 230 L702 230" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M798 260 L798 304" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M798 380 L798 428" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M894 470 L926 470 Q934 470 934 462 L934 208 Q934 200 942 200 L950 200" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M1142 268 L1142 336" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M1066 396 L1066 436" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M1066 512 L1066 552" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M1066 636 L1066 676" marker-end="url(#fb-p6-ah)"/>
+<path class="c back" d="M874 342 L900 342 Q908 342 908 334 L908 168 Q908 160 900 160 L660 160" marker-end="url(#fb-p6-ah)"/>
+<path class="c back" d="M1150 474 L1192 474 Q1200 474 1200 482 L1200 514" marker-end="url(#fb-p6-ah)"/>
+<path class="c back" d="M966 714 L760 714" marker-end="url(#fb-p6-ah)"/>
+<path class="c" d="M1166 714 L1206 714" marker-end="url(#fb-p6-ah)"/>
+<rect class="mask" x="304" y="384" width="48" height="18" rx="2"/>
+<text class="lbl" x="309" y="397">있으면</text>
+<rect class="mask" x="28" y="366" width="68" height="36" rx="2"/>
+<text class="lbl" x="33" y="379">없으면 →</text>
+<text class="lbl" x="33" y="397">PR 본문</text>
+<rect class="mask" x="808" y="395" width="36" height="18" rx="2"/>
+<text class="lbl" x="813" y="408">통과</text>
+<rect class="mask" x="1076" y="523" width="48" height="18" rx="2"/>
+<text class="lbl" x="1081" y="536">없으면</text>
+<rect class="mask" x="836" y="264" width="64" height="36" rx="2"/>
+<text class="lbl" x="841" y="277">미통과 ·</text>
+<text class="lbl" x="841" y="295">수정 요청</text>
+<rect class="mask" x="1184" y="522" width="32" height="18" rx="2"/>
+<text class="lbl" x="1189" y="535">3장</text>
+<rect class="mask" x="1154" y="430" width="52" height="36" rx="2"/>
+<text class="lbl" x="1159" y="443">있으면</text>
+<text class="lbl" x="1159" y="461">→ 3장</text>
+<rect class="mask" x="720" y="705" width="32" height="18" rx="2"/>
+<text class="lbl" x="725" y="718">3장</text>
+<rect class="mask" x="808" y="688" width="148" height="18" rx="2"/>
+<text class="lbl" x="813" y="701">있으면 → 3장 새 브랜치</text>
+<rect class="mask" x="1170" y="686" width="48" height="18" rx="2"/>
+<text class="lbl" x="1175" y="699">없으면</text>
+<g class="cell ai"><rect class="shape" x="32" y="136" width="176" height="60" rx="6"/><text class="title" x="44" y="160">Claude 리뷰</text><text class="sub" x="44" y="182">변경 전체 검토</text></g>
+<g class="tag"><rect x="32" y="204" width="148" height="24"/><text x="40" y="221"><tspan class="num">①</tspan> <tspan class="tagname">ponytail-review</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="224" y="136" width="144" height="60" rx="6"/><text class="title" x="236" y="160">자체 리뷰</text><text class="sub" x="236" y="182">놓친 예외를 가장 깊게</text></g>
+<g class="cell dev"><rect class="shape" x="80" y="268" width="240" height="60" rx="6"/><text class="title" x="92" y="292">Claude 리뷰와 자체 리뷰 대조</text><text class="sub" x="92" y="314">반영할 피드백을 결정한다</text></g>
+<g class="cell dev decision"><path class="shape" d="M200 372 L300 410 L200 448 L100 410 Z"/><text class="dtitle" x="200" y="415" text-anchor="middle">반영할 피드백이 있나</text></g>
+<g class="cell ai"><rect class="shape" x="412" y="136" width="248" height="120" rx="6"/><text class="title" x="424" y="160">PR 댓글 작성 여부 판단 ·</text><text class="title" x="424" y="178">필요하면 작성</text><text class="sub" x="424" y="200">방향이 바뀌었는지 먼저 결정한다</text><text class="sub" x="424" y="224">바뀌면 쌓인 커밋 푸시 명령을 먼저</text><text class="sub" x="424" y="242">제시하고 PR 댓글을 게시한다</text></g>
+<g class="tag"><rect x="412" y="264" width="136" height="24"/><text x="420" y="281"><tspan class="num">②</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell ai"><rect class="shape" x="412" y="328" width="248" height="84" rx="6"/><text class="title" x="424" y="352">피드백 반영 · 인수 확인 다시</text><text class="sub" x="424" y="374">개발자가 결정한 피드백을 수정한다</text><text class="sub" x="424" y="398">5장 절차로 앱을 기동해 다시 확인한다</text></g>
+<g class="cell ai"><rect class="shape" x="412" y="452" width="248" height="108" rx="6"/><text class="title" x="424" y="476">체크포인트 보고</text><text class="sub" x="424" y="498">반영 내역과 인수 확인 결과</text><text class="sub" x="424" y="522">경로를 명시한 스테이징</text><text class="sub" x="424" y="546">단계별 추천 커밋 명령</text></g>
+<g class="tag"><rect x="412" y="568" width="128" height="24"/><text x="420" y="585"><tspan class="num">③</tspan> <tspan class="mono">git-guard.py</tspan></text></g>
+<g class="tag"><rect x="412" y="600" width="136" height="24"/><text x="420" y="617"><tspan class="num">④</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="702" y="200" width="192" height="60" rx="6"/><text class="title" x="714" y="224">리뷰</text><text class="sub" x="714" y="246">반영 결과 검토</text></g>
+<g class="cell dev decision"><path class="shape" d="M798 304 L874 342 L798 380 L722 342 Z"/><text class="dtitle" x="798" y="347" text-anchor="middle">통과인가</text></g>
+<g class="cell dev"><rect class="shape" x="702" y="428" width="192" height="84" rx="6"/><text class="title" x="714" y="452">커밋 · 푸시</text><text class="sub" x="714" y="474">추천 명령으로 커밋</text><text class="sub" x="714" y="498">병합 전에 쌓인 커밋까지 푸시</text></g>
+<g class="cell ai"><rect class="shape" x="950" y="136" width="232" height="132" rx="6"/><text class="title" x="962" y="160">PR 본문 · 병합 명령</text><text class="sub" x="962" y="182">작업 내용</text><text class="sub" x="962" y="206">검토에서 바뀐 것</text><text class="sub" x="962" y="230">인수 확인 결과</text><text class="sub" x="962" y="254">드래프트 해제·스쿼시 병합 명령 제시</text></g>
+<g class="tag"><rect x="950" y="276" width="136" height="24"/><text x="958" y="293"><tspan class="num">⑤</tspan> <tspan class="mono">stop-check.py</tspan></text></g>
+<g class="cell dev"><rect class="shape" x="950" y="336" width="232" height="60" rx="6"/><text class="title" x="962" y="360">실행</text><text class="sub" x="962" y="382">추천 명령 실행</text></g>
+<g class="cell ai decision"><path class="shape" d="M1066 436 L1150 474 L1066 512 L982 474 Z"/><text class="dtitle" x="1066" y="479" text-anchor="middle">다음 브랜치가 있나</text></g>
+<g class="cell dev"><rect class="shape" x="950" y="552" width="232" height="84" rx="6"/><text class="title" x="962" y="576">기능 전체 검토</text><text class="sub" x="962" y="598">설계 문서의 모든 브랜치를 병합한 뒤</text><text class="sub" x="962" y="622">Claude 리뷰와 자체 리뷰를 대조한다</text></g>
+<g class="cell dev decision"><path class="shape" d="M1066 676 L1166 714 L1066 752 L966 714 Z"/><text class="dtitle" x="1066" y="719" text-anchor="middle">반영할 피드백이 있나</text></g>
+<circle class="end-ring" cx="1216" cy="714" r="9"/><circle class="end-dot" cx="1216" cy="714" r="5"/><text class="legend" x="1216" y="740" text-anchor="middle">끝</text>
+<line class="rule" x1="16" y1="778" x2="1224" y2="778"/>
+<g class="cell ai swatch"><rect class="shape" x="16" y="785" width="14" height="14" rx="3"/></g><text class="legend" x="38" y="796">Claude</text>
+<g class="cell dev swatch"><rect class="shape" x="136" y="785" width="14" height="14" rx="3"/></g><text class="legend" x="158" y="796">개발자</text>
+<path class="swatch-decision" d="M271 785 L278 792 L271 799 L264 792 Z"/><text class="legend" x="286" y="796">판단</text>
+</svg>
+<!-- ch6:end -->
+      </figure>
+      <!-- notes6:start -->
+<ol class="notes">
+<li><span class="num">①</span> <b>ponytail-review</b><dl><dt>적용 시점</dt><dd>Claude가 브랜치의 변경 전체를 리뷰할 때</dd><dt>역할</dt><dd>diff 만 검토한다. 표준 라이브러리나 이미 설치된 의존성으로 대신할 수 있는 코드, 사용하지 않는 코드, 과한 추상화를 찾는다.</dd></dl></li>
+<li><span class="num">②</span> <code>stop-check.py</code>: 대조 결과를 받은 뒤의 답변을 검사한다. PR 댓글 작성 여부를 판단하지 않았으면 답변을 반려한다. 전체 조건은 4장 ④에 있다.</li>
+<li><span class="num">③</span> <code>git-guard.py</code><dl><dt>적용 시점</dt><dd>Claude가 셸 명령을 실행하기 전</dd><dt>차단 대상</dt><dd>git add -A, git add --all, git add . 을 차단한다.</dd></dl></li>
+<li><span class="num">④</span> <code>stop-check.py</code>: 반영 보고의 커밋 명령을 검사한다. PR 댓글을 게시했는데 git push 블록이 없거나 「검토:」 줄에 댓글 주소가 없으면 답변을 반려한다. 전체 조건은 3장 ①에 있다.</li>
+<li><span class="num">⑤</span> <code>stop-check.py</code>: PR 본문·병합 명령을 제시하는 답변을 검사한다. 이번 턴에 상태 확인 명령(git status·log·diff·branch·rev-parse, gh pr view·list·status)을 하나도 실행하지 않았으면 답변을 반려한다. 전체 조건은 3장 ①에 있다.</li>
+</ol>
+<!-- notes6:end -->
+    </section>
+
+    <section id="always">
+      <h2>모든 장에 적용되는 장치</h2>
+      <p>아래 셋은 특정 단계가 아니라 작업 내내 적용된다.</p>
+      <ul class="always">
+        <li><code>settings.json</code>: Claude가 실행하는 명령 가운데 rebase, force push, reset, <code>checkout --</code>, restore, clean, stash drop, stash clear, <code>branch -D</code>, <code>rm -r</code> 을 차단한다. PR 브랜치 이력을 다시 쓰면 댓글과 커밋의 연결이 끊긴다.</li>
+        <li><code>agent-guard.py</code>: Claude가 일을 나눠 맡기는 서브에이전트를 호출할 때 모델을 지정하면 차단한다. 서브에이전트는 세션의 모델을 그대로 사용한다.</li>
+        <li><code>memory-note.py</code>: Claude가 대화 사이에 기록하는 파일(메모리)에 기록한 뒤 그 내용을 전역 규칙이나 저장소 문서에 둘지 다시 확인하게 알린다. 차단하지 않는다.</li>
+      </ul>
+    </section>
+
+    <p class="closing">이 흐름을 만든 과정과 아직 답을 내리지 못한 것은 <a href="index.html">회고</a>에 기록했다. 규칙·훅·스킬 파일 목록과 자동 검사 범위는 <a href="https://github.com/Ting97ok/ai-global-rules#readme">저장소 README</a>에 있다.</p>
+
+    <p><a class="back" href="https://github.com/Ting97ok/ai-global-rules#readme" data-back>← ai-global-rules README</a></p>
+  </main>
+
+  <script>
+    /* 같은 탭으로 들어왔으면 돌아가기를 브라우저 뒤로 가기로 바꾼다. 보던 페이지와 스크롤 위치로 돌아간다.
+       GitHub 에서 왔으면 README 로, 회고에서 왔으면 회고로 돌아간다. 그 밖의 경우(직접 입력·새 탭)는 README 링크 그대로 둔다 */
+    (function () {
+      var ref = document.referrer;
+      if (history.length < 2) return;
+      var label;
+      if (/^https:\/\/github\.com\//.test(ref)) {
+        label = /^https:\/\/github\.com\/Ting97ok\/ai-global-rules\/?(#.*)?$/.test(ref) ? '← README로 돌아가기' : '← 돌아가기';
+      } else if (/^https:\/\/ting97ok\.github\.io\/ai-global-rules\/(index\.html)?(#.*)?$/.test(ref)) {
+        label = '← 회고로 돌아가기';
+      } else {
+        return;
+      }
+      document.querySelectorAll('[data-back]').forEach(function (a) {
+        a.textContent = label;
+        a.addEventListener('click', function (e) { e.preventDefault(); history.back(); });
+      });
+    })();
+  </script>
+</body>
+</html>
