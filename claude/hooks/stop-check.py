@@ -2,11 +2,11 @@
 """Stop — 답변을 끝내기 전에 마지막 답변의 bash 블록을 검사한다. ~/.claude/CLAUDE.md 「작업 성향 · 보여주기와 명령」.
 
 막는 것 (decision: block 으로 되돌려 답변을 고치게 한다):
-  1. 사용자에게 시키는 조회 명령. cat·less·head·tail·sed -n·grep 만으로 된 블록.
-     봐야 할 내용은 답변에 직접 싣는다.
+  1. 사용자에게 시키는 조회 명령. 첫 줄이 cat·less·more·head·tail·bat·sed -n·grep 으로 시작하고(앞의 `cd … &&` 는
+     건너뛴다) 2번의 커밋·푸시·PR 명령이 없는 블록. 봐야 할 내용은 답변에 직접 싣는다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 주면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 돌리지 않은 것.
-  3. 이번 턴의 마지막 테스트 실행이 실패했는데 커밋 명령을 주는 것. 한 사이클은 GREEN 까지 간다(「TDD」).
+  3. 이번 턴의 마지막 테스트 실행이 실패했는데 2번의 커밋·푸시·PR 명령을 주는 것. 한 사이클은 GREEN 까지 간다(「TDD」).
      내용이 없는 빈 커밋(--allow-empty)은 뺀다. 브랜치를 열어 드래프트 PR 을 만드는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 도는 것이 정상이라 마지막 실행만 본다.
   4. 현재 대화에서 고친 문서가 커밋에 새 파일이거나 추가·삭제 50줄 이상으로 들어가는데, 마지막으로 고친 뒤
