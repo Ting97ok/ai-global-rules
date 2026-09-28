@@ -28,8 +28,8 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, as_text, called_paths, cd_targets, is_document, is_test_run, load_rows, run_failed,
-                     said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, NOT_REQUEST, as_text, called_paths, cd_targets, is_document, is_test_run, load_rows,
+                     run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -42,9 +42,6 @@ GIT_PUSH = re.compile(r"\bgit\s+push\b")
 GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
 BASH_BLOCK = re.compile(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", re.S)
-# 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
-NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
-               "Stop hook feedback", "Base directory for this skill")
 # doc-writing 「처음 읽는 독자로 확인한다」의 「크게 고친 문서」 기준. 오타 수정 같은 작은 커밋은 묻지 않는다
 BIG_CHANGE = 50
 

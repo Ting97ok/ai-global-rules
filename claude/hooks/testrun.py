@@ -198,12 +198,17 @@ def load_rows(path):
     return rows
 
 
+# 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
+NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
+               "Stop hook feedback", "Base directory for this skill")
+
+
 def human_message(row):
-    """Claude 기록에서 사용자가 직접 보낸 메시지면 그 글을 낸다. 스킬 본문·작업 알림·컴팩트 요약은 뺀다."""
+    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약은 뺀다."""
     content = (row.get("message") or {}).get("content")
     if row.get("type") != "user" or row.get("isMeta") or row.get("isCompactSummary") or not isinstance(content, str):
         return ""
-    return "" if content.lstrip().startswith("<task-notification>") else content
+    return "" if content.lstrip().startswith(NOT_REQUEST) else content
 
 
 def answers(row):
