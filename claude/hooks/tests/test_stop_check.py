@@ -369,9 +369,13 @@ class StopCheck(unittest.TestCase):
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
 
+COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
+CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
+CROSS_CHECK_TASK = f"{COMPANION} task --fresh --cwd /repo --prompt-file /private/tmp/s/xcheck-prompt.md"
+
+
 def cross_check_call(call_id):
-    return bash_call(call_id, "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs task "
-                              "--fresh --cwd /repo --prompt-file /private/tmp/s/xcheck-prompt.md")
+    return bash_call(call_id, f"{CROSSCHECK_RUN} {CROSS_CHECK_TASK}")
 
 
 def notification(tool_id):
@@ -495,6 +499,30 @@ class CommentDecision(unittest.TestCase):
             answer(REVIEW_COMMIT + "\n```bash\ncd /repo && git push\n```\n"),
         ])
         self.assertEqual("", stdout.strip(), stdout)
+
+
+# codex-cross-check 「진행」. 교차 검증의 Codex 작업은 crosscheck.py run 으로 감싸 모델과 사용량을 기록한다
+class CrossCheckRun(unittest.TestCase):
+    def test_Codex_작업을_crosscheck_run_없이_직접_호출하면_반려한다(self):
+        cases = {
+            "직접 호출": (CROSS_CHECK_TASK, "block"),
+            "run 으로 감싼 호출": (f"{CROSSCHECK_RUN} {CROSS_CHECK_TASK}", ""),
+            "독자 테스트": (f"{COMPANION} task --fresh --cwd /private/tmp/s/reader-test-plan "
+                        "--prompt-file /private/tmp/s/reader-test-plan/prompt.txt", ""),
+            "독자 테스트 폴더의 파일만 넘긴 교차 검증": (f"{COMPANION} task --fresh --cwd /repo "
+                                          "--prompt-file /private/tmp/s/reader-test-plan/judge.md", "block"),
+            "작업이 아닌 명령": (f"{COMPANION} setup --json && {COMPANION} status && {COMPANION} result", ""),
+            "heredoc 본문에 적힌 호출": (f"cat > /private/tmp/s/p.md <<'EOF'\n{CROSS_CHECK_TASK}\nEOF", ""),
+        }
+        for name, (command, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("교차 검증해"), bash_call("c1", command), bash_result("c1", "## 답"),
+                        answer("검증을 마쳤습니다.")]
+                stdout = run(transcript(rows, folder)).stdout
+                if expected:
+                    self.assertIn("crosscheck.py run", stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
 
 
 def codex_call(call_id, command):
