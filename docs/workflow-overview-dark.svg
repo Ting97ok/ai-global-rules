@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1062 282" role="img" aria-labelledby="flow-title flow-desc">
+<title id="flow-title">작업 흐름. 각 단계의 산출물이 개발자의 관문을 지나 다음 단계로 간다</title>
+<desc id="flow-desc">각 단계의 산출물이 개발자의 관문을 지나야 다음 단계로 넘어간다. 1 Claude가 설계 문서 초안을 작성한다. 개발자가 읽고 이해한다. 이해가 안 되면 다시 질문한다. 문서 규칙과 훅, 독자 테스트가 이 관문에 붙어 있다. 2 Claude가 테스트와 구현을 작성한다. 개발자가 사이클마다 리뷰하고 커밋한다. 리뷰에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 결정한다. 3 Claude가 앱을 기동해 호출한다. 개발자가 결과를 확인한다. 결과에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 결정한다. 4 Claude가 변경 전체를 리뷰한다. 개발자도 전체를 자체 리뷰한다. 개발자가 Claude 리뷰와 자체 리뷰를 대조해 필요한 지적만 남기고 마무리한다.</desc>
+<style>
+text { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+text { font-size: 14px; font-weight: 700; fill: #edf1f7; text-anchor: middle; }
+.ai { font-size: 12.5px; font-weight: 600; fill: #b9a4f2; }
+.gate-label { font-size: 12.5px; fill: #e2b95b; }
+.lane { font-size: 13px; text-anchor: start; }
+.lane.ai-lane { fill: #b9a4f2; }
+.lane.dev-lane { fill: #e2b95b; }
+.lbl { font-size: 11px; font-weight: 600; fill: #b9a4f2; }
+.tag-text { font-size: 11px; font-weight: 600; fill: #edf1f7; }
+.end { font-size: 13px; fill: #abb5c4; text-anchor: start; }
+.art { fill: #171d27; stroke: #303948; stroke-width: 1.5; }
+.gate { fill: #3a3016; stroke: #e2b95b; stroke-width: 1.8; }
+.tag { fill: #242c38; stroke: #abb5c4; stroke-width: 1; }
+.arrow { fill: none; stroke: #abb5c4; stroke-width: 1.8; }
+.ahead { fill: #abb5c4; }
+.ai-arrow { fill: none; stroke: #b9a4f2; stroke-width: 1.8; }
+.ai-arrow.back { stroke-dasharray: 4 4; }
+.ahead-ai { fill: #b9a4f2; }
+.ret path { fill: none; stroke: #abb5c4; stroke-width: 1.8; stroke-dasharray: 6 5; }
+.ahead-ret { fill: #abb5c4; }
+.ret text { font-size: 12px; font-weight: 600; fill: #abb5c4; }
+{ width: 100%; left: 0; transform: none; }
+</style>
+<defs><marker id="ah-h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker><marker id="ah-h-ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead-ai"/></marker><marker id="ah-h-ret" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead-ret"/></marker></defs>
+<text class="lane ai-lane" x="8" y="58">Claude</text>
+<text class="lane dev-lane" x="8" y="204">개발자</text>
+<text class="ai" x="92" y="58">초안 작성</text>
+<line class="ai-arrow" x1="92" y1="68" x2="92" y2="123" marker-end="url(#ah-h-ai)"/>
+<rect class="art" x="40" y="126" width="104" height="48" rx="8"/>
+<text x="92" y="155">설계 문서</text>
+<path class="gate" d="M182 150 L212 120 L242 150 L212 180 Z"/>
+<text class="gate-label" x="212" y="204">이해</text>
+<text class="ai" x="332" y="58">테스트 → 구현</text>
+<line class="ai-arrow" x1="332" y1="68" x2="332" y2="123" marker-end="url(#ah-h-ai)"/>
+<rect class="art" x="280" y="126" width="104" height="48" rx="8"/>
+<text x="332" y="155">테스트·코드</text>
+<path class="gate" d="M422 150 L452 120 L482 150 L452 180 Z"/>
+<text class="gate-label" x="452" y="204">리뷰·커밋</text>
+<text class="ai" x="572" y="58">앱 기동·호출</text>
+<line class="ai-arrow" x1="572" y1="68" x2="572" y2="123" marker-end="url(#ah-h-ai)"/>
+<rect class="art" x="520" y="126" width="104" height="48" rx="8"/>
+<text x="572" y="155">실행 결과</text>
+<path class="gate" d="M662 150 L692 120 L722 150 L692 180 Z"/>
+<text class="gate-label" x="692" y="204">결과 확인</text>
+<text class="ai" x="812" y="58">Claude 리뷰</text>
+<line class="ai-arrow" x1="812" y1="68" x2="812" y2="123" marker-end="url(#ah-h-ai)"/>
+<rect class="art" x="760" y="126" width="104" height="48" rx="8"/>
+<text x="812" y="146">Claude 리뷰</text><text x="812" y="165">자체 리뷰</text>
+<path class="gate" d="M902 150 L932 120 L962 150 L932 180 Z"/>
+<text class="gate-label" x="932" y="204">Claude 리뷰와 자체 리뷰 대조</text>
+<line class="arrow" x1="147" y1="150" x2="179" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="245" y1="150" x2="277" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="387" y1="150" x2="419" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="485" y1="150" x2="517" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="627" y1="150" x2="659" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="725" y1="150" x2="757" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="867" y1="150" x2="899" y2="150" marker-end="url(#ah-h)"/>
+<line class="arrow" x1="966" y1="150" x2="1002" y2="150" marker-end="url(#ah-h)"/>
+<text class="end" x="1008" y="155">마무리</text>
+<line class="ai-arrow back" x1="212" y1="117" x2="212" y2="72" marker-end="url(#ah-h-ai)"/>
+<text class="lbl" x="219" y="106" style="text-anchor:start">다시 질문</text>
+<rect class="tag" x="137" y="213" width="150" height="20" rx="10"/>
+<text class="tag-text" x="212" y="227">문서 규칙 · 훅 · 독자 테스트</text>
+<g class="ret"><path d="M741 152 V250 H92 V178" marker-end="url(#ah-h-ret)"/><path d="M501 152 V250"/><text x="296" y="269">설계 허점을 찾으면 재설계하거나 기술 부채로 남김</text></g>
+</svg>

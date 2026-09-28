@@ -19,13 +19,21 @@ def repo_with_change(folder):
     (Path(folder) / "a.py").write_text("print('ok')\n", encoding="utf-8")
 
 
-def run(command, response, cwd):
+def write_row(path):
+    """Write 도구 호출이 대화 기록에 남는 꼴."""
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "toolu_w", "name": "Write", "input": {"file_path": str(path), "content": "x"}}]}}
+
+
+def run(command, response, cwd, transcript=None):
     payload = {
         "hook_event_name": "PostToolUse",
         "tool_name": "Bash",
         "tool_input": {"command": command},
         "tool_response": response,
     }
+    if transcript:
+        payload["transcript_path"] = transcript
     return subprocess.run(
         [sys.executable, str(HOOK)], input=json.dumps(payload),
         capture_output=True, text=True, cwd=cwd,
@@ -93,6 +101,37 @@ class CommitCheckpoint(unittest.TestCase):
                 folder,
             )
             self.assertEqual("", result.stdout.strip(), result.stdout)
+
+    def test_이번_세션에서_고친_파일이_남았을_때만_체크포인트를_낸다(self):
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as logs:
+            repo_with_change(folder)
+            log = Path(logs) / "transcript.jsonl"
+            cases = {
+                "세션 전부터 있던 변경뿐": ([], False),
+                "이번 세션에서 고친 파일": ([write_row(Path(folder) / "a.py")], True),
+            }
+            for name, (rows, expected) in cases.items():
+                with self.subTest(name=name):
+                    log.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+                    result = run("python3 tests/test_x.py", "Ran 1 test in 0.03s\n\nOK", folder, str(log))
+                    self.assertEqual(expected, "체크포인트" in result.stdout, result.stdout)
+
+    def test_파일_이름에_빌드_도구_이름이_있는_조회_명령은_실행으로_보지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            for command in ("grep -n jackson build.gradle", "git show HEAD:build.gradle | head", "ls gradle/"):
+                with self.subTest(command=command):
+                    result = run(command, "implementation 'x'", folder)
+                    self.assertEqual("", result.stdout.strip(), result.stdout)
+
+    def test_명령_자리에_온_빌드_도구는_실행으로_본다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            for command in ("./gradlew test --tests FooTest", "JAVA_HOME=/opt/jdk ./gradlew build", "npx vitest run",
+                            'for f in tests/test_*.py; do python3 "$f"; done'):
+                with self.subTest(command=command):
+                    result = run(command, "BUILD SUCCESSFUL", folder)
+                    self.assertIn("체크포인트", result.stdout)
 
     def test_명령이_아예_실행되지_못하면_체크포인트를_내지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:

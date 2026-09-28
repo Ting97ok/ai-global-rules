@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""PostToolUse(Write|Edit) — 메모리 디렉터리에 썼을 때 기록 위치 규칙을 되새긴다. 막지 않는다.
+"""PostToolUse(Write|Edit) — 메모리 디렉터리에 기록했을 때 기록 위치 규칙을 다시 알린다. 차단하지 않는다.
 
 ~/.claude/CLAUDE.md 「작업 성향 · 기록 위치」: 전역 규칙 → 저장소 규칙 → 메모리 순서.
-이번 작업에서만 쓰고 끝날 것만 메모리에 둔다.
+이번 작업에서만 사용하고 끝날 것만 메모리에 둔다.
 """
 import json
 import sys

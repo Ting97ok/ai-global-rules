@@ -124,7 +124,7 @@ grep -q 'project_doc_fallback_filenames' "$T/out4" && ok "주석 처리된 설�
 
 echo "Claude 전용 규칙을 바로잡는 설정을 확인한다"
 grep -q 'developer_instructions' "$T/out" && ok "설정이 없으면 알려 준다" || no "설정 안내가 없다"
-printf 'developer_instructions = "교차 검증과 doc-skill-guard 는 Claude 전용이다"\n' >> "$T/codex/config.toml"
+printf 'developer_instructions = "교차 검증, doc-skill-guard, 독자 테스트 확인은 Claude 전용이다"\n' >> "$T/codex/config.toml"
 CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
   sh "$SCRIPT" -f > "$T/out5" 2>&1 || true
 grep -q 'developer_instructions' "$T/out5" && no "설정이 있는데도 알려 준다" || ok "설정이 있으면 잠잠하다"

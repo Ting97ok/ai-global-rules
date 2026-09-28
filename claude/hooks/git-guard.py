@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""PreToolUse(Bash) — git·gh 명령에서 규칙 위반을 실행 전에 막는다.
+"""PreToolUse(Bash) — git·gh 명령에서 규칙 위반을 실행 전에 차단한다.
 
-막는 것 (~/.claude/CLAUDE.md 「커밋 체크포인트」·「브랜치·PR 흐름」):
+차단 대상 (~/.claude/CLAUDE.md 「커밋 체크포인트」·「브랜치·PR 흐름」):
   1. git add -A / --all / .            경로를 명시한다
   2. 커밋 메시지 접두사 없음            [Feat] [Fix] [HotFix] [Docs] [Test] [Refactor]
   3. 커밋 메시지·PR 본문의 도구 서명    Co-Authored-By: Claude / Generated with Claude Code
-  4. git push 의 + 강제 refspec          이력을 다시 쓰지 않는다 (--force 는 settings 가 막는다)
-  5. gh pr merge --merge / --rebase      스쿼시만 쓴다
+  4. git push 의 + 강제 refspec          이력을 재작성하지 않는다 (--force 는 settings 가 차단한다)
+  5. gh pr merge --merge / --rebase      스쿼시만 사용한다
   6. 드래프트가 아닌 gh pr create, gh pr ready, gh pr merge 에 PR 본문 3항목이 없음
-  7. PR 본문의 전각 대시 문장 잇기 (PR 본문도 문서 작성 규칙을 따른다)
+  7. PR 본문의 전각 대시 문장 연결 (PR 본문도 문서 작성 규칙을 따른다)
   8. 브랜치의 두 번째 커밋인데 열린 PR 이 없음   드래프트 PR 을 먼저 연다
-  9. `검토:` 줄에 댓글 주소가 없음            그 결정을 남긴 PR 댓글을 단다
+  9. `검토:` 줄에 댓글 주소가 없음            그 결정을 기록한 PR 댓글 주소를 추가한다
+ 10. gh pr comment 인데 푸시하지 않은 커밋이 있음   댓글과 관계없는 커밋이 타임라인에서 댓글 아래에 표시된다
+ 11. gh pr comment 인데 댓글의 「변경 파일:」에 없는 미커밋 변경이 있음   관계없는 변경을 먼저 커밋·푸시한다
+ 12. 「교차 검증 지적:」 줄이 있는 댓글                교차 검증 결과는 댓글로 게시하지 않는다
+ 13. 「사용자 피드백:」 줄이 두 번 이상인 댓글          피드백은 건마다 댓글을 별도로 게시한다
+ 14. 결정 댓글의 한 줄에 문장이 둘 이상               줄마다 한 문장으로 요약한다. 「다.」로 끝나는 문장을 집계한다
 
+이 훅은 Claude 가 Bash 도구로 실행하는 명령에만 적용된다. 사용자가 `!` 로 실행하는 커밋은 stop-check 가 추천 명령에서 확인한다.
 종료 코드 2 + stderr 가 차단이다. 판단이 필요한 것은 여기 두지 않는다.
 """
 import json
@@ -25,6 +31,12 @@ PREFIX = re.compile(r"^\[(Feat|Fix|HotFix|Docs|Test|Refactor)\]")
 SIGNATURE = re.compile(r"Co-Authored-By:\s*Claude|Generated with \[?Claude Code|🤖", re.IGNORECASE)
 SECTIONS = ("작업 내용", "검토에서 바뀐", "인수 확인")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
+CHANGED_FILES = re.compile(r"^\s*변경 파일\s*:(.*)$", re.M)
+CROSS_CHECK_LINE = re.compile(r"^\s*교차 검증 지적\s*:", re.M)
+FEEDBACK_LINE = re.compile(r"^\s*사용자 피드백\s*:", re.M)
+DECISION_LINE = re.compile(r"^\s*(1차 AI 결정|사용자 피드백|2차 AI 결정\(피드백 반영\)|2차 AI 결정 근거"
+                           r"|직전 결정|다시 바뀐 계기|새 결정|새 결정 근거)\s*:(.*)$", re.M)
+SENTENCE_END = re.compile(r"다\.(?=\s|$)")
 
 
 def fail(msg):
@@ -145,6 +157,43 @@ def missing_sections(body):
     return [s for s in SECTIONS if s not in (body or "")]
 
 
+def comment_format_problems(body):
+    """댓글 본문이 「브랜치·PR 흐름」의 댓글 형식을 어긴 곳을 모은다."""
+    problems = []
+    if CROSS_CHECK_LINE.search(body):
+        problems.append("Codex 교차 검증 결과는 PR 댓글로 남기지 않는다. 결과는 답변에서만 보고한다")
+    if len(FEEDBACK_LINE.findall(body)) > 1:
+        problems.append("피드백이 여러 건이면 한 댓글에 모으지 않고 건마다 댓글을 따로 올린다")
+    long_lines = [m.group(1) for m in DECISION_LINE.finditer(body) if len(SENTENCE_END.findall(m.group(2))) > 1]
+    if long_lines:
+        problems.append("댓글은 요약해서 줄마다 한 문장으로 쓴다. 문장이 둘 이상인 줄: " + ", ".join(long_lines))
+    return problems
+
+
+def unpushed_commits(cwd):
+    """업스트림에 올리지 않은 커밋 수. 업스트림이 없으면 0 이다."""
+    r = subprocess.run(["git", "rev-list", "--count", "@{u}..HEAD"],
+                       cwd=cwd or None, capture_output=True, text=True, timeout=10)
+    return int(r.stdout.strip()) if r.returncode == 0 and r.stdout.strip().isdigit() else 0
+
+
+def unlisted_changes(body, cwd):
+    """댓글의 「변경 파일:」 줄에 이름이 없는 미커밋 추적 파일.
+
+    「없음」으로 시작하면 뒤 문장은 설명이라 적은 파일이 없는 것으로 본다. 줄이 없으면 묻지 않는다.
+    """
+    found = CHANGED_FILES.search(body or "")
+    if not found:
+        return []
+    listed = "" if found.group(1).strip().startswith("없음") else found.group(1)
+    r = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                       cwd=cwd or None, capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        return []
+    paths = [line[3:].split(" -> ")[-1] for line in r.stdout.splitlines() if len(line) > 3]
+    return [p for p in paths if os.path.basename(p) not in listed]
+
+
 def check_git(toks, cwd):
     sub = toks[1] if len(toks) > 1 else ""
     if sub == "add":
@@ -187,6 +236,19 @@ def check_gh(toks, cwd):
             if miss:
                 fail("드래프트가 아닌 PR 은 본문에 「작업 내용 / 검토에서 바뀐 것 / 인수 확인」이 있어야 한다. "
                      f"빠진 것: {', '.join(miss)}. 먼저 --draft 로 열거나 본문을 채운다")
+    elif sub == "comment":
+        body = pr_body_from_args(toks, cwd)
+        problems = comment_format_problems(body)
+        if problems:
+            fail(" / ".join(problems))
+        ahead = unpushed_commits(cwd)
+        if ahead:
+            fail(f"푸시하지 않은 커밋이 {ahead}개 있다. 이대로 댓글을 올리면 댓글과 관계없는 커밋이 타임라인에서 "
+                 "댓글 아래에 놓인다. 사용자 푸시를 먼저 받고 댓글을 올린다")
+        stray = unlisted_changes(body, cwd)
+        if stray:
+            fail(f"댓글의 「변경 파일:」에 없는 미커밋 변경이 있다: {', '.join(stray)}. "
+                 "댓글과 관계없는 변경은 먼저 커밋·푸시하고 댓글을 올린다")
     elif sub == "merge":
         if "--merge" in toks or "-m" in toks or "--rebase" in toks or "-r" in toks:
             fail("PR 은 스쿼시로 합친다 (--squash). 사이클 이력은 PR 에 남는다")
