@@ -72,23 +72,26 @@ if js_start != -1:
 
 # ---------- 내용 ----------
 arts = ["설계 문서", "테스트·코드", "실행 결과", "Claude 리뷰 · 자체 리뷰"]
-ai_acts = ["초안 작성", "테스트 → 구현", "앱 띄워 호출", "Claude 리뷰"]
+ai_acts = ["초안 작성", "테스트 → 구현", "앱 기동·호출", "Claude 리뷰"]
 gates = ["이해", "리뷰·커밋", "결과 확인", "Claude 리뷰와 자체 리뷰 대조"]
-DESC = ("Claude가 만든 산출물이 개발자의 관문을 지나야 다음 Claude 작업으로 넘어간다. "
-        "1 Claude가 설계 문서 초안을 쓴다. 개발자가 읽고 이해한다. 이해가 안 되면 되묻는다. 문서 규칙과 훅, 독자 테스트가 이 관문에 붙어 있고 이 글의 주제다. "
-        "2 Claude가 테스트와 구현을 쓴다. 개발자가 사이클마다 리뷰하고 커밋한다. 리뷰에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 정한다. "
-        "3 Claude가 앱을 띄워 호출한다. 개발자가 결과를 확인한다. 결과에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 정한다. "
+DESC = ("각 단계의 산출물이 개발자의 관문을 지나야 다음 단계로 넘어간다. "
+        "1 Claude가 설계 문서 초안을 작성한다. 개발자가 읽고 이해한다. 이해가 안 되면 다시 질문한다. 문서 규칙과 훅, 독자 테스트가 이 관문에 붙어 있고 이 글의 주제다. "
+        "2 Claude가 테스트와 구현을 작성한다. 개발자가 사이클마다 리뷰하고 커밋한다. 리뷰에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 결정한다. "
+        "3 Claude가 앱을 기동해 호출한다. 개발자가 결과를 확인한다. 결과에서 설계 허점을 찾으면 설계 문서로 돌아가 재설계할지 기술 부채로 남길지 결정한다. "
         "4 Claude가 변경 전체를 리뷰한다. 개발자도 전체를 자체 리뷰한다. 개발자가 Claude 리뷰와 자체 리뷰를 대조해 필요한 지적만 남기고 마무리한다.")
 
-def topic_zone(x, y, w, h, out):
-    """설계 문서와 이해 관문을 굵은 테두리로 묶고 왼쪽 위에 탭 라벨을 단다. 뒤에 깔리게 맨 앞에 넣는다."""
+def topic_zone(x, y, w, h, out, tab_x=None):
+    """설계 문서와 이해 관문을 굵은 테두리로 묶고 위에 탭 라벨을 단다. 뒤에 깔리게 맨 앞에 넣는다.
+
+    tab_x 는 탭 왼쪽 끝이다. 주지 않으면 테두리 왼쪽에서 12 안쪽이다."""
     name, fs = "이 글의 주제", 12
     text_w = sum(4 if c == " " else fs for c in name)
     tab_w = text_w + 24; tab_w += -tab_w % 4
+    x0 = (x + 12 if tab_x is None else tab_x) - 12
     out.insert(0, f'<rect class="topic" x="{x}" y="{y}" width="{w}" height="{h}" rx="10"/>'
-                  f'<path class="topic-tab" d="M{x + 12} {y} V{y - 22} Q{x + 12} {y - 28} {x + 18} {y - 28} '
-                  f'H{x + 6 + tab_w} Q{x + 12 + tab_w} {y - 28} {x + 12 + tab_w} {y - 22} V{y}"/>'
-                  f'<text class="topic-name" x="{x + 12 + tab_w // 2}" y="{y - 9}">{name}</text>')
+                  f'<path class="topic-tab" d="M{x0 + 12} {y} V{y - 22} Q{x0 + 12} {y - 28} {x0 + 18} {y - 28} '
+                  f'H{x0 + 6 + tab_w} Q{x0 + 12 + tab_w} {y - 28} {x0 + 12 + tab_w} {y - 22} V{y}"/>'
+                  f'<text class="topic-name" x="{x0 + 12 + tab_w // 2}" y="{y - 9}">{name}</text>')
 
 
 def markers(sfx):
@@ -132,7 +135,7 @@ H.append(f'<line class="arrow" x1="{END_X0}" y1="{MAIN_Y}" x2="{END_X1}" y2="{MA
 H.append(f'<text class="end" x="{END_X1 + 6}" y="{MAIN_Y + 5}">마무리</text>')
 g1x = xs[1][2]
 H.append(f'<line class="ai-arrow back" x1="{g1x}" y1="{MAIN_Y - 33}" x2="{g1x}" y2="{AI_Y + 14}" marker-end="url(#ah-h-ai)"/>')
-H.append(f'<text class="lbl" x="{g1x + 7}" y="{AI_Y + 48}" style="text-anchor:start">되묻기</text>')
+H.append(f'<text class="lbl" x="{g1x + 7}" y="{AI_Y + 48}" style="text-anchor:start">다시 질문</text>')
 tag_w = 150
 H.append(f'<rect class="tag" x="{g1x - tag_w // 2}" y="{GATE_LBL_Y + 9}" width="{tag_w}" height="20" rx="10"/>')
 H.append(f'<text class="tag-text" x="{g1x}" y="{GATE_LBL_Y + 23}">문서 규칙 · 훅 · 독자 테스트</text>')
@@ -142,10 +145,10 @@ H.append(f'<g class="ret"><path d="M{b3x} {MAIN_Y + 2} V{RET_Y} H{a1x} V{MAIN_Y 
          f'<path d="M{b2x} {MAIN_Y + 2} V{RET_Y}"/>'
          f'<text x="{(b2x + a1x) // 2}" y="{RET_Y + 19}">설계 허점을 찾으면 재설계하거나 기술 부채로 남김</text></g>')
 H_PLAIN = list(H)                        # README 판은 「이 글의 주제」 영역 없이 쓴다
-topic_zone(xs[0][1] - 12, MAIN_Y - 42, (g1x + tag_w // 2 + 12) - (xs[0][1] - 12), (GATE_LBL_Y + 29 + 10) - (MAIN_Y - 42), H)
+topic_zone(xs[0][1] - 12, MAIN_Y - 42, (g1x + tag_w // 2 + 12) - (xs[0][1] - 12), (GATE_LBL_Y + 29 + 10) - (MAIN_Y - 42), H, tab_x=106)
 h_w = END_X1 + 60
 h_svg = (f'<svg class="h" viewBox="0 0 {h_w} {RET_Y + 32}" role="img" aria-labelledby="flow-title-h" aria-describedby="flow-desc-h">\n'
-         '          <title id="flow-title-h">작업 흐름. Claude 가 만든 산출물이 개발자의 관문을 지나 다음 Claude 작업으로 간다</title>\n'
+         '          <title id="flow-title-h">작업 흐름. 각 단계의 산출물이 개발자의 관문을 지나 다음 단계로 간다</title>\n'
          f'          <desc id="flow-desc-h">{DESC}</desc>\n'
          f'          <defs>{markers("h")}</defs>\n' + "\n".join("          " + s for s in H) + "\n        </svg>")
 
@@ -190,7 +193,7 @@ V.append(f'<line class="arrow" x1="{CX}" y1="{END_Y0}" x2="{CX}" y2="{END_Y1}" m
 V.append(f'<text class="end" x="{CX + 10}" y="{END_Y1 + 4}">마무리</text>')
 g1y = ys[1][2]
 V.append(f'<line class="ai-arrow back" x1="{CX - 33}" y1="{g1y}" x2="{AI_X_END + 12}" y2="{g1y}" marker-end="url(#ah-v-ai)"/>')
-V.append(f'<text class="lbl" x="{(CX - 33 + AI_X_END + 12) // 2}" y="{g1y - 8}">되묻기</text>')
+V.append(f'<text class="lbl" x="{(CX - 33 + AI_X_END + 12) // 2}" y="{g1y - 8}">다시 질문</text>')
 tag_w2 = 136
 V.append(f'<rect class="tag" x="{CX + 38}" y="{g1y + 12}" width="{tag_w2}" height="20" rx="10"/>')
 V.append(f'<text class="tag-text" x="{CX + 38 + tag_w2 // 2}" y="{g1y + 26}">문서 규칙 · 훅 · 독자 테스트</text>')
@@ -201,14 +204,14 @@ V.append(f'<g class="ret"><path d="M{CX + 2} {b3y} H{RET_X} V{a1y} H{CX + RW2 //
          f'<text x="{(CX + RW2 // 2 + RET_X) // 2 + 2}" y="{a1y - 9}">재설계·부채 판단</text></g>')
 topic_zone(CX - RW2 // 2 - 12, ys[0][1] - 12, (CX + 38 + tag_w2 + 10) - (CX - RW2 // 2 - 12), (g1y + 42) - (ys[0][1] - 12), V)
 v_svg = (f'<svg class="v" viewBox="0 0 {RET_X + 22} {END_Y1 + 26}" role="img" aria-labelledby="flow-title-v" aria-describedby="flow-desc-v">\n'
-         '          <title id="flow-title-v">작업 흐름. Claude 가 만든 산출물이 개발자의 관문을 지나 다음 Claude 작업으로 간다</title>\n'
+         '          <title id="flow-title-v">작업 흐름. 각 단계의 산출물이 개발자의 관문을 지나 다음 단계로 간다</title>\n'
          f'          <desc id="flow-desc-v">{DESC}</desc>\n'
          f'          <defs>{markers("v")}</defs>\n' + "\n".join("          " + s for s in V) + "\n        </svg>")
 
 block = ('      <p class="flow-lead">내 작업 흐름은 아래와 같다. 이 글은 그 가운데 첫 관문, 설계 문서를 이해하는 일에서 생긴 문제를 다룬다.</p>\n'
          '      <figure class="flow">\n'
          f'        {h_svg}\n        {v_svg}\n'
-         '        <figcaption>작업 흐름. 보라색은 Claude가 하는 일, 노란 마름모는 개발자가 판단하는 관문이다. Claude가 만든 산출물이 관문을 지나야 다음 Claude 작업으로 넘어간다. 굵은 테두리로 묶은 설계 문서와 이해 관문, 거기 붙은 문서 규칙·훅·독자 테스트가 이 글의 주제다. 독자 테스트는 문서만 읽는 AI에게 질문에 답하게 해 빠진 설명과 필요 없는 글을 찾는 절차다. 이 글에서 개발자는 나다. 절차마다 누가 무엇을 하고 어떤 훅과 스킬(필요할 때만 불러 읽는 지시 파일)이 적용되는지는 <a href="ai-workflow.html">AI Workflow</a> 문서에 그렸다.</figcaption>\n'
+         '        <figcaption>작업 흐름. 보라색은 Claude가 하는 일, 노란 마름모는 개발자가 판단하는 관문이다. 각 단계의 산출물이 개발자의 관문을 지나야 다음 단계로 넘어간다. 굵은 테두리로 묶은 설계 문서와 이해 관문, 거기 붙은 문서 규칙·훅·독자 테스트가 이 글의 주제다. 독자 테스트는 문서만 읽는 AI에게 질문에 답하게 해 빠진 설명과 필요 없는 글을 찾는 절차다. 이 글에서 개발자는 나다. 절차마다 누가 무엇을 하고 어떤 훅과 스킬(필요할 때만 호출해 읽는 지시 파일)이 적용되는지는 <a href="ai-workflow.html">AI Workflow</a> 문서에 그렸다.</figcaption>\n'
          '      </figure>\n')
 c = t.index('      <p class="flow-lead">')
 dd = t.index("      </figure>\n") + len("      </figure>\n")
@@ -235,7 +238,7 @@ for theme, vals in THEMES.items():
     style = re.sub(r"var\(--([\w-]+)\)", lambda m: vals[m.group(1)], style)
     style = 'text { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }\n' + style
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {h_w} {RET_Y + 32}" role="img" aria-labelledby="flow-title flow-desc">\n'
-           '<title id="flow-title">작업 흐름. Claude 가 만든 산출물이 개발자의 관문을 지나 다음 Claude 작업으로 간다</title>\n'
+           '<title id="flow-title">작업 흐름. 각 단계의 산출물이 개발자의 관문을 지나 다음 단계로 간다</title>\n'
            f'<desc id="flow-desc">{DESC_README}</desc>\n'
            f'<style>\n{style}\n</style>\n<defs>{markers("h")}</defs>\n' + "\n".join(H_PLAIN) + "\n</svg>\n")
     out = FILE.parent / f"workflow-overview-{theme}.svg"
