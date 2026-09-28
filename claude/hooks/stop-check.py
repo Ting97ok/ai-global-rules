@@ -265,20 +265,34 @@ def direct_codex_tasks(rows):
             if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
 
 
-def noted_items(rows):
-    """마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목."""
+def reply(row):
+    """그 줄이 나간 답이면 그 글."""
+    p = codex_payload(row)
+    if p is not None:
+        return as_text(p.get("content")) if p.get("type") == "message" and p.get("role") == "assistant" else ""
+    return row_text(row) if row.get("type") == "assistant" else ""
+
+
+def unreported_items(rows):
+    """마지막 요청 뒤에 crosscheck.py note 로 기록했는데 그 뒤에 나간 답변 어디에도 제목이 없는 항목.
+
+    보고를 마친 뒤 사용자가 `!` 명령을 실행하면 다음 답변도 같은 요청 범위다. 마지막 답변만 보면 같은 제목을 다시 요구하게 된다.
+    """
     requests = [i for i, r in enumerate(rows) if is_request(r)]
-    since = rows[requests[-1] + 1:] if requests else rows
-    items = []
-    for command in map(without_heredoc_bodies, commands_in(since)):
-        if not NOTE.search(command):
-            continue
-        try:
-            words = shlex.split(command)
-        except ValueError:
-            words = command.split()
-        items += [words[i + 1] for i, word in enumerate(words[:-1]) if word == "--item"]
-    return items
+    start = requests[-1] + 1 if requests else 0
+    missing = []
+    for i in range(start, len(rows)):
+        for command in map(without_heredoc_bodies, commands_in([rows[i]])):
+            if not NOTE.search(command):
+                continue
+            try:
+                words = shlex.split(command)
+            except ValueError:
+                words = command.split()
+            later = [reply(r) for r in rows[i + 1:]]
+            missing += [words[j + 1] for j, word in enumerate(words[:-1])
+                        if word == "--item" and not any(words[j + 1] in text for text in later)]
+    return missing
 
 
 def main():
@@ -341,7 +355,7 @@ def main():
     if direct_codex_tasks(rows):
         problems.append("교차 검증의 Codex 작업은 `crosscheck.py run --session {Claude 세션 ID} -- …` 로 감싸 호출한다. "
                         "직접 호출하면 모델과 사용량이 기록되지 않는다. 독자 테스트(--cwd 가 reader-test-*)는 대상이 아니다")
-    missing = [item for item in noted_items(rows) if item not in last_text]
+    missing = unreported_items(rows)
     if missing:
         problems.append("교차 검증에서 기록한 항목을 답변에 보고하지 않았다: " + ", ".join(missing) +
                         ". `crosscheck.py report --session {Claude 세션 ID}` 출력으로 항목마다 요약을 싣는다")
