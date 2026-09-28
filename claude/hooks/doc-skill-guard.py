@@ -3,7 +3,7 @@
 
 전역 규칙 「문서 작성」이 doc-writing 을 먼저 호출하게 하고, doc-writing 「쓰기 전에 캐묻는다」가
 grill-me 나 grill-with-docs 로 사용자에게 먼저 질문하게 한다. 그 호출이 대화 기록에 있는지만 확인한다.
-사용자가 「캐묻기 생략」이라고 작성하거나 질문 창에서 그렇게 답했으면 캐묻기 확인은 생략한다.
+사용자가 「심층 인터뷰 생략」이라고 작성하거나 질문 창에서 그렇게 답했으면 심층 인터뷰 확인은 생략한다.
 종료 코드 2 + stderr 가 차단이다.
 """
 import json
@@ -14,7 +14,7 @@ from testrun import called_paths, edited_paths, failed_calls, human_message, is_
 
 SKILL = "doc-writing"
 GRILL = {"grill-me", "grill-with-docs"}
-SKIP = "캐묻기 생략"
+SKIP = "심층 인터뷰 생략"
 
 
 def skills(row):
@@ -64,7 +64,7 @@ def main():
     if asked or all(os.path.realpath(p) in covered for p in docs):
         return
     print(f"[doc-skill-guard] 문서를 쓰거나 고치기 전에 `grill-me` 나 `grill-with-docs` 로 사용자에게 캐묻는다. "
-          f"건너뛰려면 사용자가 「캐묻기 생략」이라고 말해야 한다. {target}", file=sys.stderr)
+          f"건너뛰려면 사용자가 「{SKIP}」이라고 말해야 한다. {target}", file=sys.stderr)
     sys.exit(2)
 
 

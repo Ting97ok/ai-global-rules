@@ -218,7 +218,7 @@ def answers(row):
 def said(row, phrase):
     """그 줄이 사용자 메시지나 질문 창 답이고, 한 줄에 phrase 만 따로 썼는지 본다.
 
-    「캐묻기 생략은 하지 마」 같은 문장은 세지 않는다.
+    「심층 인터뷰 생략은 하지 마」 같은 문장은 세지 않는다.
     """
     text = human_message(row) + "\n" + answers(row)
     return any(line.strip() == phrase for line in text.splitlines())
