@@ -524,6 +524,31 @@ class CrossCheckRun(unittest.TestCase):
                 else:
                     self.assertEqual("", stdout.strip(), stdout)
 
+    def test_note_로_기록한_항목의_제목이_답변에_없으면_반려한다(self):
+        crosscheck = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py"
+        notes = (f"{crosscheck} note --session s1 --item '한도 이름' --round 1 --claude '한도 기간으로 정한다' "
+                 f"--codex '같다' --decision 일치 && {crosscheck} note --session s1 --item '기록 위치' --round 1 "
+                 "--claude '세션마다 파일 하나' --codex '같다' --decision 일치")
+        noted = [human("교차 검증해"), bash_call("n1", notes), bash_result("n1", "")]
+        cases = {
+            "두 항목 모두 보고": ([*noted, answer("1. 한도 이름\n2. 기록 위치")], None),
+            "한 항목 누락": ([*noted, answer("1. 한도 이름")], "기록 위치"),
+            "앞선 요청에서 기록한 항목": ([*noted, answer("1. 한도 이름\n2. 기록 위치"),
+                                  human("다음 작업 진행해"), answer("진행했습니다.")], None),
+            "heredoc 본문에 적힌 note 명령": ([human("교차 검증해"),
+                                         bash_call("p1", f"cat > /private/tmp/s/p.md <<'EOF'\n{notes}\nEOF"),
+                                         bash_result("p1", ""), answer("프롬프트를 작성했습니다.")], None),
+        }
+        for name, (rows, missing) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript(rows, folder)).stdout
+                if missing:
+                    self.assertIn("block", stdout)
+                    self.assertIn(missing, stdout)
+                    self.assertNotIn("한도 이름", stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
 
 def codex_call(call_id, command):
     return {"type": "response_item", "payload": {
