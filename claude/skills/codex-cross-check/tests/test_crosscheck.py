@@ -3,6 +3,7 @@
 
 실행: python3 ~/.claude/skills/codex-cross-check/tests/test_crosscheck.py
 """
+import json
 import os
 import subprocess
 import sys
@@ -20,6 +21,20 @@ def env(home):
 
 def crosscheck(home, *args):
     return subprocess.run([sys.executable, str(TOOL), *args], capture_output=True, text=True, env=env(home))
+
+
+OLD, NEW = "00000000-0000-7000-8000-00000000000a", "00000000-0000-7000-8000-00000000000b"
+
+
+def limits(used):
+    return {"primary": {"used_percent": used, "window_minutes": 10080, "resets_at": 1791047840}, "secondary": None}
+
+
+def turn(model, used):
+    """Codex 기록 파일에 한 턴이 남기는 줄. 모델·추론 수준과 사용량이 들어 있다."""
+    return "".join(json.dumps(row) + "\n" for row in [
+        {"type": "turn_context", "payload": {"model": model, "effort": "high"}},
+        {"type": "event_msg", "payload": {"type": "token_count", "rate_limits": limits(used)}}])
 
 
 def note(home, item, round_, **fields):
@@ -85,6 +100,25 @@ class Run(unittest.TestCase):
             self.assertEqual(3, proc.wait())
             self.assertEqual("진행 중\n", first)
             self.assertIn("Codex 답", rest)
+
+    def test_run_은_호출이_쓴_Codex_기록의_세션_ID_모델_추론_수준_사용량을_기록한다(self):
+        # 새 작업은 기록 파일을 새로 만들고, 이어 묻기(--resume-last)는 앞선 파일에 이어 쓴다.
+        # 호출이 기록을 남기지 못했으면 앞선 호출의 기록을 이번 호출로 기록하지 않는다
+        for name, written in {"새 기록": NEW, "이어 쓴 기록": OLD, "기록 없음": None}.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as home:
+                day = Path(home) / ".codex" / "sessions" / "2026" / "09" / "28"
+                day.mkdir(parents=True)
+                old = day / f"rollout-2026-09-28T09-00-00-{OLD}.jsonl"
+                old.write_text(turn("gpt-5.6-sol", 1.0), encoding="utf-8")
+                os.utime(old, (1e9, 1e9))
+                target = day / f"rollout-2026-09-28T10-00-00-{NEW}.jsonl" if written == NEW else old
+                fake = f"open({str(target)!r}, 'a').write({turn('gpt-6-sol', 7.0)!r})" if written else "pass"
+                crosscheck(home, "run", "--session", "s1", "--", sys.executable, "-c", fake)
+                log = Path(home) / ".claude" / "crosscheck" / "s1.jsonl"
+                rows = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+                expected = [{"run": {"codex_session": written, "model": "gpt-6-sol", "effort": "high",
+                                     "rate_limits": limits(7.0)}}] if written else []
+                self.assertEqual(expected, rows)
 
 
 if __name__ == "__main__":
