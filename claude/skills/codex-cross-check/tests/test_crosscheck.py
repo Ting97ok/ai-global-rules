@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 TOOL = Path(__file__).resolve().parent.parent / "crosscheck.py"
+USAGE = TOOL.with_name("usage.py")
 
 
 def env(home):
@@ -76,6 +77,28 @@ class Report(unittest.TestCase):
             out = crosscheck(home, "report", "--session", "s1").stdout
             self.assertTrue(out.startswith("1. 기록 위치\n"), out)
             self.assertNotIn("창 이름", out)
+
+    def test_report_는_마지막_줄에_마지막_호출의_usage_출력을_붙인다(self):
+        # run 기록이 없으면 usage.py 를 인자 없이 실행해 가장 최근 Codex 기록을 읽는다
+        for name, called in {"run 기록 있음": True, "run 기록 없음": False}.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as home:
+                day = Path(home) / ".codex" / "sessions" / "2026" / "09" / "28"
+                day.mkdir(parents=True)
+                note(home, "창 이름", "1", claude="창 길이로 정한다", codex="같다", decision="일치")
+                if called:
+                    new = day / f"rollout-2026-09-28T10-00-00-{NEW}.jsonl"
+                    crosscheck(home, "run", "--session", "s1", "--", sys.executable, "-c",
+                               f"open({str(new)!r}, 'w').write({turn('gpt-6-sol', 7.0)!r})")
+                # 다른 작업이 run 뒤에 남긴 더 최근 기록
+                latest = day / f"rollout-2026-09-28T11-00-00-{OLD}.jsonl"
+                latest.write_text(turn("gpt-5.6-sol", 50.0), encoding="utf-8")
+                os.utime(latest, (2e9, 2e9))
+                out = crosscheck(home, "report", "--session", "s1").stdout
+                tail = subprocess.run([sys.executable, str(USAGE), *([NEW] if called else [])],
+                                      capture_output=True, text=True, env=env(home)).stdout
+                self.assertIn("gpt-6-sol" if called else "gpt-5.6-sol", tail)
+                self.assertTrue(out.startswith("1. 창 이름\n"), out)
+                self.assertTrue(out.endswith(tail), out)
 
 
 class Run(unittest.TestCase):
