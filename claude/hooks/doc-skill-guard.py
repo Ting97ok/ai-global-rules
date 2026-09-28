@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse(Write|Edit|MultiEdit|Bash) — 문서를 쓰거나 고치기 전에 doc-writing 과 캐묻기 스킬을 불렀는지 확인한다.
+"""PreToolUse(Write|Edit|MultiEdit|Bash) — 문서를 작성하거나 수정하기 전에 doc-writing 과 캐묻기 스킬을 호출했는지 확인한다.
 
-전역 규칙 「문서 작성」이 doc-writing 을 먼저 부르고, doc-writing 「쓰기 전에 캐묻는다」가
-grill-me 나 grill-with-docs 로 사용자에게 먼저 묻게 한다. 그 호출이 대화 기록에 있는지만 본다.
-사용자가 「캐묻기 생략」이라고 쓰거나 질문 창에서 그렇게 답했으면 캐묻기 확인은 건너뛴다.
+전역 규칙 「문서 작성」이 doc-writing 을 먼저 호출하게 하고, doc-writing 「쓰기 전에 캐묻는다」가
+grill-me 나 grill-with-docs 로 사용자에게 먼저 질문하게 한다. 그 호출이 대화 기록에 있는지만 확인한다.
+사용자가 「캐묻기 생략」이라고 작성하거나 질문 창에서 그렇게 답했으면 캐묻기 확인은 생략한다.
 종료 코드 2 + stderr 가 차단이다.
 """
 import json
