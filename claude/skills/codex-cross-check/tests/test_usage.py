@@ -21,7 +21,7 @@ def row(primary, secondary, resets):
 
 
 def window_row(minutes):
-    """창이 하나뿐인 기록. 주간 창 하나만 쓰는 계정은 primary 에 주간 창이 오고 secondary 는 비어 있다."""
+    """한도가 하나뿐인 기록. 주간 한도만 있는 계정은 primary 에 주간 한도가 오고 secondary 는 비어 있다."""
     return {"type": "event_msg", "payload": {"type": "token_count", "rate_limits": {
         "primary": {"used_percent": 7.0, "window_minutes": minutes, "resets_at": 1791047840},
         "secondary": None}}}
@@ -39,7 +39,7 @@ def usage(rows):
 
 
 class Usage(unittest.TestCase):
-    def test_창_이름은_창_길이로_정하고_빈_창은_출력하지_않는다(self):
+    def test_한도_이름은_한도_기간으로_정하고_값이_없는_한도는_출력하지_않는다(self):
         for minutes, name in {300: "5시간", 10080: "주간", 60: "60분"}.items():
             with self.subTest(minutes=minutes):
                 out = usage([window_row(minutes)])
