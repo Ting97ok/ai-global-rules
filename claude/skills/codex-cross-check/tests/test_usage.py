@@ -26,6 +26,10 @@ def window_row(minutes):
         "secondary": None}}}
 
 
+def context_row(model, effort):
+    return {"type": "turn_context", "payload": {"model": model, "effort": effort}}
+
+
 def usage(rows):
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "rollout.jsonl"
@@ -41,6 +45,20 @@ class Usage(unittest.TestCase):
                 lines = [l for l in out.splitlines() if "남음" in l]
                 self.assertEqual(1, len(lines), out)
                 self.assertTrue(lines[0].startswith(f"{name} "), out)
+
+    def test_첫_줄에_마지막_턴의_모델과_추론_수준을_출력한다(self):
+        # 같은 기록에서 이어 물으면 턴마다 모델이 바뀔 수 있다. 옛 기록에는 턴 기록이 없고 rate_limits 가 null 이다
+        turns = [context_row("gpt-5.6-sol", "medium"), context_row("gpt-6-sol", "high")]
+        old = {"type": "event_msg", "payload": {"type": "token_count", "rate_limits": None}}
+        cases = {
+            "사용량 있음": ([*turns, window_row(10080)], "모델 gpt-6-sol, 추론 수준 high"),
+            "사용량 없음": (turns, "모델 gpt-6-sol, 추론 수준 high"),
+            "옛 기록": ([old], "모델 모름, 추론 수준 모름"),
+        }
+        for name, (rows, first) in cases.items():
+            with self.subTest(name=name):
+                out = usage(rows)
+                self.assertEqual(first, out.splitlines()[0], out)
 
     def test_마지막_기록의_남은_사용량을_읽는다(self):
         with tempfile.TemporaryDirectory() as folder:
