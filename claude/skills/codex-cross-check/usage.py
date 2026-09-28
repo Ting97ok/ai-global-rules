@@ -44,6 +44,22 @@ def last_limits(path):
     return found
 
 
+def last_context(path):
+    """마지막 턴의 turn_context. 같은 기록에서 이어 물으면 턴마다 모델이 바뀔 수 있다."""
+    found = {}
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if '"turn_context"' not in line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("type") == "turn_context":
+                found = row.get("payload") or {}
+    return found
+
+
 def line(window):
     if not isinstance(window, dict) or window.get("used_percent") is None:
         return None
@@ -60,6 +76,8 @@ def main():
     if not path or not Path(path).exists():
         print("Codex 기록을 찾지 못했다")
         return
+    context = last_context(path)
+    print(f"모델 {context.get('model', '모름')}, 추론 수준 {context.get('effort', '모름')}")
     limits = last_limits(path)
     if not limits:
         print("이 기록에 사용량이 없다")
