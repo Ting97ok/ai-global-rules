@@ -44,9 +44,11 @@ def last_limits(path):
     return found
 
 
-def line(name, window):
+def line(window):
     if not isinstance(window, dict) or window.get("used_percent") is None:
         return None
+    minutes = window.get("window_minutes")
+    name = {300: "5시간", 10080: "주간"}.get(minutes, f"{minutes}분")
     left = round(100 - float(window["used_percent"]), 1)
     reset = window.get("resets_at")
     when = time.strftime("%m/%d %H:%M", time.localtime(reset)) if reset else "모름"
@@ -62,8 +64,8 @@ def main():
     if not limits:
         print("이 기록에 사용량이 없다")
         return
-    for name, key in (("5시간", "primary"), ("7일", "secondary")):
-        got = line(name, limits.get(key))
+    for key in ("primary", "secondary"):
+        got = line(limits.get(key))
         if got:
             print(got)
 
