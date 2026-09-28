@@ -50,6 +50,15 @@ class Report(unittest.TestCase):
                 "   - Codex: 같다\n"
                 "   - 결정: 일치\n"), out)
 
+    def test_report_는_마지막_report_뒤에_기록한_항목만_출력한다(self):
+        with tempfile.TemporaryDirectory() as home:
+            note(home, "창 이름", "1", claude="창 길이로 정한다", codex="같다", decision="일치")
+            crosscheck(home, "report", "--session", "s1")
+            note(home, "기록 위치", "1", claude="세션마다 파일 하나", codex="같다", decision="일치")
+            out = crosscheck(home, "report", "--session", "s1").stdout
+            self.assertTrue(out.startswith("1. 기록 위치\n"), out)
+            self.assertNotIn("창 이름", out)
+
 
 if __name__ == "__main__":
     unittest.main()
