@@ -4,6 +4,7 @@
 실행: python3 ~/.claude/skills/codex-cross-check/tests/test_usage.py
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -59,6 +60,21 @@ class Usage(unittest.TestCase):
             with self.subTest(name=name):
                 out = usage(rows)
                 self.assertEqual(first, out.splitlines()[0], out)
+
+    def test_인자가_파일이_아니면_CODEX_HOME_에서_그_세션의_기록을_찾는다(self):
+        wanted, newer = "00000000-0000-7000-8000-000000000001", "00000000-0000-7000-8000-000000000002"
+        with tempfile.TemporaryDirectory() as home:
+            day = Path(home) / "sessions" / "2026" / "09" / "28"
+            day.mkdir(parents=True)
+            (day / f"rollout-2026-09-28T15-18-38-{wanted}.jsonl").write_text(
+                json.dumps(context_row("gpt-6-sol", "high")), encoding="utf-8")
+            # 가장 최근 기록을 읽으면 틀리게 하려고 다른 세션의 기록을 더 최근으로 둔다
+            recent = day / f"rollout-2026-09-28T16-00-00-{newer}.jsonl"
+            recent.write_text(json.dumps(context_row("gpt-5.6-sol", "medium")), encoding="utf-8")
+            os.utime(recent, (2e9, 2e9))
+            out = subprocess.run([sys.executable, str(TOOL), wanted], capture_output=True, text=True,
+                                 env={**os.environ, "CODEX_HOME": home}).stdout
+            self.assertEqual("모델 gpt-6-sol, 추론 수준 high", out.splitlines()[0], out)
 
     def test_마지막_기록의_남은_사용량을_읽는다(self):
         with tempfile.TemporaryDirectory() as folder:
