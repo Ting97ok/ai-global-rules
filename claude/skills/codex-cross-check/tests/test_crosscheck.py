@@ -13,10 +13,13 @@ from pathlib import Path
 TOOL = Path(__file__).resolve().parent.parent / "crosscheck.py"
 
 
+def env(home):
+    """기록 폴더가 임시 폴더를 가리키도록 HOME 과 CODEX_HOME 을 바꾼다."""
+    return {**os.environ, "HOME": home, "CODEX_HOME": str(Path(home) / ".codex")}
+
+
 def crosscheck(home, *args):
-    """기록 폴더가 임시 폴더를 가리키도록 HOME 과 CODEX_HOME 을 바꿔 실행한다."""
-    env = {**os.environ, "HOME": home, "CODEX_HOME": str(Path(home) / ".codex")}
-    return subprocess.run([sys.executable, str(TOOL), *args], capture_output=True, text=True, env=env)
+    return subprocess.run([sys.executable, str(TOOL), *args], capture_output=True, text=True, env=env(home))
 
 
 def note(home, item, round_, **fields):
@@ -58,6 +61,30 @@ class Report(unittest.TestCase):
             out = crosscheck(home, "report", "--session", "s1").stdout
             self.assertTrue(out.startswith("1. 기록 위치\n"), out)
             self.assertNotIn("창 이름", out)
+
+
+class Run(unittest.TestCase):
+    def test_run_은_감싼_명령의_출력을_캡처하지_않고_흘리며_종료_코드를_돌려준다(self):
+        with tempfile.TemporaryDirectory() as home:
+            signal = Path(home) / "signal"
+            # 가짜 Codex 호출. 첫 줄을 낸 뒤 신호를 기다린다. 신호가 5초 안에 오지 않으면 9 로 끝난다
+            fake = ("import os, sys, time\n"
+                    "print('진행 중', flush=True)\n"
+                    "for _ in range(50):\n"
+                    f"    if os.path.exists({str(signal)!r}):\n"
+                    "        print('Codex 답', flush=True)\n"
+                    "        sys.exit(3)\n"
+                    "    time.sleep(0.1)\n"
+                    "sys.exit(9)\n")
+            proc = subprocess.Popen([sys.executable, str(TOOL), "run", "--session", "s1", "--", sys.executable, "-c", fake],
+                                    stdout=subprocess.PIPE, text=True, env=env(home))
+            # 출력을 캡처했다가 끝에 내보내면 여기서 가짜 호출이 끝날 때까지 기다리게 되고 신호가 늦는다
+            first = proc.stdout.readline()
+            signal.touch()
+            rest = proc.stdout.read()
+            self.assertEqual(3, proc.wait())
+            self.assertEqual("진행 중\n", first)
+            self.assertIn("Codex 답", rest)
 
 
 if __name__ == "__main__":
