@@ -28,8 +28,8 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, NOT_REQUEST, as_text, called_paths, cd_targets, content_blocks, is_document, is_test_run,
-                     load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, human_message, is_document,
+                     is_test_run, load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
@@ -183,12 +183,10 @@ def row_text(row):
 
 
 def is_request(row):
-    """사용자가 직접 쓴 요청인지. 작업 알림·스킬 본문·훅 되먹임·`!` 명령은 요청이 아니다."""
+    """사용자가 직접 쓴 요청인지. Claude 기록은 doc-skill-guard 와 같은 testrun human_message 로 판정한다."""
     if codex_payload(row) is not None:
         return is_human_turn(row)
-    if not is_human_turn(row) or row.get("isMeta") or row.get("isCompactSummary"):
-        return False
-    return not row_text(row).lstrip().startswith(NOT_REQUEST)
+    return bool(human_message(row))
 
 
 def is_user_command(row):
