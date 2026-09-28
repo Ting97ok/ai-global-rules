@@ -7,7 +7,10 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+import usage
 
 # note 가 받는 요지와 report 가 붙이는 이름
 FIELDS = (("claude", "Claude"), ("codex", "Codex"), ("split", "갈림"), ("decision", "결정"), ("reason", "근거"))
@@ -25,8 +28,17 @@ def write(session, row):
 
 
 def run(args):
+    started = time.time()
     # 출력을 캡처하지 않는다. Codex 의 진행 줄이 호출한 쪽 화면에 바로 나와야 한다
-    sys.exit(subprocess.run(args.command).returncode)
+    code = subprocess.run(args.command).returncode
+    # 이 호출이 쓴 기록. 새 작업은 파일을 새로 만들고 이어 묻기는 앞선 파일에 이어 쓴다
+    written = [p for p in usage.SESSIONS.rglob("rollout-*.jsonl") if p.stat().st_mtime >= started]
+    if written:
+        path = max(written, key=lambda p: p.stat().st_mtime)
+        context = usage.last_context(path)
+        write(args.session, {"run": {"codex_session": path.stem[-36:], "model": context.get("model"),
+                                     "effort": context.get("effort"), "rate_limits": usage.last_limits(path)}})
+    sys.exit(code)
 
 
 def note(args):
