@@ -33,7 +33,8 @@ from testrun import (FAILURE, as_text, called_paths, cd_targets, is_document, is
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
-STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+STATE_CHECK = re.compile(r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(status|log|diff|branch|rev-parse)\b"""
+                         r"|\bgh\s+pr\s+(view|list|status)\b")
 EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
 COMMIT = re.compile(r"\bgit\s+commit\b")
 GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
