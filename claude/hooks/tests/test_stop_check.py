@@ -377,6 +377,30 @@ class StopCheck(unittest.TestCase):
             result = run(transcript(rows, folder))
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
+    def test_git_C_로_경로를_준_커밋_푸시_명령도_검사한다(self):
+        status = [bash_call("s1", "git -C /repo status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        comment = [bash_call("g1", "gh pr comment 13 --body-file /private/tmp/s/comment.md"),
+                   bash_result("g1", "https://github.com/o/r/pull/13#issuecomment-1")]
+        commit = 'git -C /repo add a.java && git -C /repo commit -m "[Feat] 바꾼다"'
+        review = commit + ' -m "검토: 지적 → 바뀐 것 (https://github.com/o/r/pull/13#issuecomment-1)"'
+        cases = {
+            "상태 확인 없는 커밋 명령": ([], [commit], "상태를 확인"),
+            "검토 줄에 댓글 주소가 없는 커밋 명령": (status, [commit + ' -m "검토: 지적 → 바뀐 것"'], "댓글 주소"),
+            "댓글 뒤에 푸시 블록이 없는 커밋 명령": (comment + status, [review], "git push"),
+            "댓글 뒤에 푸시 블록도 준 커밋 명령": (comment + status, [review, "git -C /repo push"], ""),
+            "빨간 상태의 빈 커밋 명령": (red + status, ['git -C /repo commit --allow-empty -m "[Fix] 브랜치 시작"'], ""),
+        }
+        for name, (before, blocks, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                text = "".join(f"```bash\n{b}\n```\n\n" for b in blocks)
+                stdout = run(transcript([human("커밋 명령 줘"), *before, answer(text)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
 CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
