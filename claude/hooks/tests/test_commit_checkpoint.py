@@ -133,6 +133,21 @@ class CommitCheckpoint(unittest.TestCase):
                     result = run(command, "BUILD SUCCESSFUL", folder)
                     self.assertIn("체크포인트", result.stdout)
 
+    def test_반복문_안의_테스트와_셸_테스트도_실행으로_본다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            repo_with_change(folder)
+            cases = {
+                "python3 앞에 다른 명령이 있는 반복문":
+                    ('for f in tests/test_*.py; do printf "%s " "$f"; python3 "$f" 2>&1 | tail -1; done', "OK", True),
+                "셸 테스트를 돌리는 반복문": ('for t in tests/*.test.sh; do sh "$t"; done', "모두 통과", True),
+                "셸 테스트": ("sh tests/sync.test.sh", "모두 통과", True),
+                "실패한 셸 테스트": ("sh tests/sync.test.sh", "  NO  스킬의 캐시 폴더를 복사했다\n실패 있음", False),
+            }
+            for name, (command, output, expected) in cases.items():
+                with self.subTest(name=name):
+                    result = run(command, output, folder)
+                    self.assertEqual(expected, "체크포인트" in result.stdout, result.stdout)
+
     def test_명령이_아예_실행되지_못하면_체크포인트를_내지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             repo_with_change(folder)
