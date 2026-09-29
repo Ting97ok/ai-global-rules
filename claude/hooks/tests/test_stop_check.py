@@ -489,6 +489,25 @@ class StopCheck(unittest.TestCase):
                     answer(f'```bash\ngit -C {folder} -C repo commit -m "[Docs] 계획 문서"\n```\n')]
             self.assertIn("plan.html", run(transcript(rows, folder)).stdout)
 
+    def test_작업_알림_앞에서_실패한_테스트도_조건_3_이_확인한다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        green = [bash_call("t2", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+                 bash_result("t2", "Ran 1 test\n\nOK")]
+        cases = {
+            "작업 알림 앞의 빨간 테스트": (red + [notification("c1")] + status, "GREEN"),
+            "작업 알림 뒤에 다시 통과한 테스트": (red + [notification("c1")] + green + status, ""),
+            "작업 알림 앞의 상태 확인": (status + [notification("c1")], "상태를 확인"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
 CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
