@@ -11,7 +11,7 @@ cp "$SRC/CLAUDE.md" claude/CLAUDE.md
 rsync -a --delete --exclude '__pycache__' "$SRC/hooks/" claude/hooks/
 jq '{permissions, hooks, enabledPlugins, extraKnownMarketplaces}' "$SRC/settings.json" > claude/settings.json
 for s in $SKILLS; do
-  rsync -a --delete "$SRC/skills/$s/" "claude/skills/$s/"
+  rsync -a --delete --exclude '__pycache__' "$SRC/skills/$s/" "claude/skills/$s/"
 done
 
 git status --short
