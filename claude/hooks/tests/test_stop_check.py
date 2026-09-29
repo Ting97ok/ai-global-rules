@@ -355,6 +355,15 @@ class StopCheck(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("GREEN", result.stdout)
 
+    def test_git_C_로_경로를_준_상태_확인도_센다(self):
+        for name, check in {"경로": "git -C /repo status --short",
+                            "따옴표로 감싼 경로": 'git -C "/work space/repo" log --oneline -2'}.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("커밋 명령 줘"), bash_call("s1", check), bash_result("s1", " M a.java"),
+                        answer(COMMIT_ANSWER)]
+                stdout = run(transcript(rows, folder)).stdout
+                self.assertEqual("", stdout.strip(), stdout)
+
     def test_빈_커밋_명령은_빨간_상태에서도_막지_않는다(self):
         rows = [
             human("브랜치를 시작해"),
@@ -369,9 +378,13 @@ class StopCheck(unittest.TestCase):
             self.assertEqual("", result.stdout.strip(), result.stdout)
 
 
+COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
+CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
+CROSS_CHECK_TASK = f"{COMPANION} task --fresh --cwd /repo --prompt-file /private/tmp/s/xcheck-prompt.md"
+
+
 def cross_check_call(call_id):
-    return bash_call(call_id, "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs task "
-                              "--fresh --cwd /repo --prompt-file /private/tmp/s/xcheck-prompt.md")
+    return bash_call(call_id, f"{CROSSCHECK_RUN} {CROSS_CHECK_TASK}")
 
 
 def notification(tool_id):
@@ -495,6 +508,59 @@ class CommentDecision(unittest.TestCase):
             answer(REVIEW_COMMIT + "\n```bash\ncd /repo && git push\n```\n"),
         ])
         self.assertEqual("", stdout.strip(), stdout)
+
+
+# codex-cross-check 「진행」. 교차 검증의 Codex 작업은 crosscheck.py run 으로 감싸 모델과 사용량을 기록한다
+class CrossCheckRun(unittest.TestCase):
+    def test_Codex_작업을_crosscheck_run_없이_직접_호출하면_반려한다(self):
+        cases = {
+            "직접 호출": (CROSS_CHECK_TASK, "block"),
+            "run 으로 감싼 호출": (f"{CROSSCHECK_RUN} {CROSS_CHECK_TASK}", ""),
+            "독자 테스트": (f"{COMPANION} task --fresh --cwd /private/tmp/s/reader-test-plan "
+                        "--prompt-file /private/tmp/s/reader-test-plan/prompt.txt", ""),
+            "독자 테스트 폴더의 파일만 넘긴 교차 검증": (f"{COMPANION} task --fresh --cwd /repo "
+                                          "--prompt-file /private/tmp/s/reader-test-plan/judge.md", "block"),
+            "작업이 아닌 명령": (f"{COMPANION} setup --json && {COMPANION} status && {COMPANION} result", ""),
+            "heredoc 본문에 적힌 호출": (f"cat > /private/tmp/s/p.md <<'EOF'\n{CROSS_CHECK_TASK}\nEOF", ""),
+        }
+        for name, (command, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("교차 검증해"), bash_call("c1", command), bash_result("c1", "## 답"),
+                        answer("검증을 마쳤습니다.")]
+                stdout = run(transcript(rows, folder)).stdout
+                if expected:
+                    self.assertIn("crosscheck.py run", stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
+    def test_note_로_기록한_항목의_제목이_답변에_없으면_반려한다(self):
+        crosscheck = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py"
+        notes = (f"{crosscheck} note --session s1 --item '한도 이름' --round 1 --claude '한도 기간으로 정한다' "
+                 f"--codex '같다' --decision 일치 && {crosscheck} note --session s1 --item '기록 위치' --round 1 "
+                 "--claude '세션마다 파일 하나' --codex '같다' --decision 일치")
+        noted = [human("교차 검증해"), bash_call("n1", notes), bash_result("n1", "")]
+        cases = {
+            "두 항목 모두 보고": ([*noted, answer("1. 한도 이름\n2. 기록 위치")], None),
+            "한 항목 누락": ([*noted, answer("1. 한도 이름")], "기록 위치"),
+            "앞선 요청에서 기록한 항목": ([*noted, answer("1. 한도 이름\n2. 기록 위치"),
+                                  human("다음 작업 진행해"), answer("진행했습니다.")], None),
+            "앞선 답변에서 보고한 뒤 사용자 명령": ([*noted, answer("1. 한도 이름\n2. 기록 위치"),
+                                        user_command('git commit -m "[Docs] 보고"'), answer("커밋이 들어갔습니다.")], None),
+            "note 전 답변에만 제목": ([human("교차 검증해"), answer("한도 이름과 기록 위치를 검증합니다."),
+                                bash_call("n1", notes), bash_result("n1", ""), answer("1. 한도 이름")], "기록 위치"),
+            "heredoc 본문에 적힌 note 명령": ([human("교차 검증해"),
+                                         bash_call("p1", f"cat > /private/tmp/s/p.md <<'EOF'\n{notes}\nEOF"),
+                                         bash_result("p1", ""), answer("프롬프트를 작성했습니다.")], None),
+        }
+        for name, (rows, missing) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript(rows, folder)).stdout
+                if missing:
+                    self.assertIn("block", stdout)
+                    self.assertIn(missing, stdout)
+                    self.assertNotIn("한도 이름", stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
 
 
 def codex_call(call_id, command):

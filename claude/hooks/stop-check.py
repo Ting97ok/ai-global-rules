@@ -6,6 +6,7 @@
      제외한다) 2번의 커밋·푸시·PR 명령이 없는 블록. 확인해야 할 내용은 답변에 직접 포함한다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 제시하면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 실행하지 않은 것.
+     `git -C 경로 status` 처럼 경로를 지정한 상태 확인도 포함한다.
   3. 이번 턴의 마지막 테스트 실행이 실패했는데 2번의 커밋·푸시·PR 명령을 제시하는 것. 한 사이클은 GREEN 까지 진행한다(「TDD」).
      내용이 없는 빈 커밋(--allow-empty)은 제외한다. 브랜치를 열어 드래프트 PR 을 생성하는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 진행하는 것이 정상이라 마지막 실행만 확인한다.
@@ -18,7 +19,13 @@
      Codex 교차 검증은 PR 댓글로 게시하지 않으므로 교차 검증만으로는 PR 댓글 판단을 요구하지 않는다.
   6. 커밋 명령의 `검토:` 줄에 PR 댓글 주소가 없는 것. 커밋은 사용자가 실행하므로 git-guard 9번이 실행되지 않는다.
   7. 요청 뒤에 PR 댓글을 게시했는데 커밋 명령 뒤에 `git push` 블록이 없는 것.
-  5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다. 요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다.
+  5~7 은 ~/.claude/CLAUDE.md 「브랜치·PR 흐름」이다.
+  8. 마지막 요청 뒤에 교차 검증의 Codex 작업(codex-companion task)을 crosscheck.py run 으로 감싸지 않고 호출한 것.
+     직접 호출하면 모델과 사용량이 기록되지 않는다. --cwd 가 reader-test-* 인 독자 테스트는 제외한다.
+  9. 마지막 요청 뒤에 crosscheck.py note 로 기록한 항목의 제목(--item)이 그 note 뒤에 나간 답변 어디에도 없는 것.
+     보고를 마친 뒤 사용자가 `!` 명령을 실행해도 같은 제목을 다시 요구하지 않는다.
+  8·9 는 codex-cross-check 「진행」·「보고」다. 교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 마지막 요청이다.
+  요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다. 판정은 testrun human_message 가 한다.
 이미 이 훅으로 반려된 턴(stop_hook_active)은 다시 반려하지 않는다. 무한 루프 방지.
 """
 import json
@@ -28,12 +35,13 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, as_text, called_paths, cd_targets, is_document, is_test_run, load_rows, run_failed,
-                     said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, human_message, is_document,
+                     is_test_run, load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
-STATE_CHECK = re.compile(r"\bgit\s+(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+STATE_CHECK = re.compile(r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(status|log|diff|branch|rev-parse)\b"""
+                         r"|\bgh\s+pr\s+(view|list|status)\b")
 EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
 COMMIT = re.compile(r"\bgit\s+commit\b")
 GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
@@ -41,9 +49,6 @@ GIT_PUSH = re.compile(r"\bgit\s+push\b")
 GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
 BASH_BLOCK = re.compile(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", re.S)
-# 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
-NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
-               "Stop hook feedback", "Base directory for this skill")
 # doc-writing 「처음 읽는 독자로 확인한다」의 「크게 고친 문서」 기준. 오타 수정 같은 작은 커밋은 묻지 않는다
 BIG_CHANGE = 50
 
@@ -90,6 +95,9 @@ def last_edits(rows):
 
 CODEX_TASK = re.compile(r"codex-companion\S*\s+task\b")
 READER_DIR = re.compile(r"reader-test-([\w.-]+?)(?:\.(?:md|html))?(?=[/\s'\"]|$)")
+WRAPPED = re.compile(r"\bcrosscheck\.py\s+run\b")
+READER_CWD = re.compile(r"--cwd[=\s]+['\"]?\S*reader-test-")
+NOTE = re.compile(r"\bcrosscheck\.py\s+note\b")
 
 
 def document_name(path):
@@ -154,14 +162,6 @@ def reader_tests(rows):
     return found
 
 
-def content_blocks(row):
-    msg = row.get("message") or {}
-    c = msg.get("content")
-    if isinstance(c, str):
-        return [{"type": "text", "text": c}]
-    return c if isinstance(c, list) else []
-
-
 def codex_payload(row):
     """Codex 기록의 payload. Claude 기록이면 None."""
     p = row.get("payload")
@@ -190,12 +190,10 @@ def row_text(row):
 
 
 def is_request(row):
-    """사용자가 직접 쓴 요청인지. 작업 알림·스킬 본문·훅 되먹임·`!` 명령은 요청이 아니다."""
+    """사용자가 직접 쓴 요청인지. Claude 기록은 doc-skill-guard 와 같은 testrun human_message 로 판정한다."""
     if codex_payload(row) is not None:
         return is_human_turn(row)
-    if not is_human_turn(row) or row.get("isMeta") or row.get("isCompactSummary"):
-        return False
-    return not row_text(row).lstrip().startswith(NOT_REQUEST)
+    return bool(human_message(row))
 
 
 def is_user_command(row):
@@ -257,6 +255,47 @@ def comment_problems(rows, last_text, blocks):
     return problems
 
 
+def direct_codex_tasks(rows):
+    """마지막 요청 뒤에 crosscheck.py run 으로 감싸지 않고 실행한 Codex 작업. 독자 테스트는 대상이 아니다.
+
+    교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 이번 턴이 아니라 마지막 요청이다.
+    """
+    requests = [i for i, r in enumerate(rows) if is_request(r)]
+    since = rows[requests[-1] + 1:] if requests else rows
+    return [c for c in map(without_heredoc_bodies, commands_in(since))
+            if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
+
+
+def reply(row):
+    """그 줄이 나간 답이면 그 글."""
+    p = codex_payload(row)
+    if p is not None:
+        return as_text(p.get("content")) if p.get("type") == "message" and p.get("role") == "assistant" else ""
+    return row_text(row) if row.get("type") == "assistant" else ""
+
+
+def unreported_items(rows):
+    """마지막 요청 뒤에 crosscheck.py note 로 기록했는데 그 뒤에 나간 답변 어디에도 제목이 없는 항목.
+
+    보고를 마친 뒤 사용자가 `!` 명령을 실행하면 다음 답변도 같은 요청 범위다. 마지막 답변만 보면 같은 제목을 다시 요구하게 된다.
+    """
+    requests = [i for i, r in enumerate(rows) if is_request(r)]
+    start = requests[-1] + 1 if requests else 0
+    missing = []
+    for i in range(start, len(rows)):
+        for command in map(without_heredoc_bodies, commands_in([rows[i]])):
+            if not NOTE.search(command):
+                continue
+            try:
+                words = shlex.split(command)
+            except ValueError:
+                words = command.split()
+            later = [reply(r) for r in rows[i + 1:]]
+            missing += [words[j + 1] for j, word in enumerate(words[:-1])
+                        if word == "--item" and not any(words[j + 1] in text for text in later)]
+    return missing
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -314,6 +353,13 @@ def main():
 
     blocks = BASH_BLOCK.findall(last_text)
     problems = comment_problems(rows, last_text, blocks)
+    if direct_codex_tasks(rows):
+        problems.append("교차 검증의 Codex 작업은 `crosscheck.py run --session {Claude 세션 ID} -- …` 로 감싸 호출한다. "
+                        "직접 호출하면 모델과 사용량이 기록되지 않는다. 독자 테스트(--cwd 가 reader-test-*)는 대상이 아니다")
+    missing = unreported_items(rows)
+    if missing:
+        problems.append("교차 검증에서 기록한 항목을 답변에 보고하지 않았다: " + ", ".join(missing) +
+                        ". `crosscheck.py report --session {Claude 세션 ID}` 출력으로 항목마다 요약을 싣는다")
     for b in blocks:
         first = b.strip().split("\n", 1)[0]
         # 앞의 cd … && 는 건너뛰고 실제 명령을 본다

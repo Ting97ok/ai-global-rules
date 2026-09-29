@@ -216,6 +216,46 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_사용자가_실행한_명령은_새_요청으로_보지_않는다(self):
+        command = user_text("<bash-input>git status --short</bash-input><bash-stdout> M a.md</bash-stdout>")
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "design" / "plan.html"
+            rows = [user_text("계획 문서 써 줘"), skill_call("doc-writing"), skill_call("grill-me"), command]
+            result = run(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "transcript_path": transcript(rows, folder),
+                    "tool_input": {"file_path": str(doc)},
+                }
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_이미지를_붙인_메시지도_요청으로_읽는다(self):
+        def attached(text):
+            """이미지를 붙인 사용자 메시지는 글이 블록 목록으로 들어온다."""
+            return {"type": "user", "message": {"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "AAAA"}},
+                {"type": "text", "text": text}]}}
+
+        cases = {
+            "새 요청": ([user_text("계획 문서 써 줘"), skill_call("doc-writing"), skill_call("grill-me"),
+                      attached("이번엔 다른 문서를 고쳐 줘")], 2),
+            "심층 인터뷰 생략": ([skill_call("doc-writing"), attached("이 메모는 바로 써 줘\n심층 인터뷰 생략")], 0),
+        }
+        for name, (rows, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                doc = Path(folder) / "design" / "plan.html"
+                result = run(
+                    {
+                        "hook_event_name": "PreToolUse",
+                        "tool_name": "Write",
+                        "transcript_path": transcript(rows, folder),
+                        "tool_input": {"file_path": str(doc)},
+                    }
+                )
+                self.assertEqual(expected, result.returncode, result.stderr)
+
     def test_컴팩트_요약은_새_요청으로_보지_않는다(self):
         summary = {"type": "user", "isCompactSummary": True, "isVisibleInTranscriptOnly": True,
                    "message": {"role": "user", "content": "This session is being continued from a previous conversation."}}
