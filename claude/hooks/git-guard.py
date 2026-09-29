@@ -195,6 +195,10 @@ def unlisted_changes(body, cwd):
 
 
 def check_git(toks, cwd):
+    # git -C 경로 … 는 그 경로에서 실행한 git 명령과 같다
+    while len(toks) > 2 and toks[1] == "-C":
+        cwd = os.path.join(cwd, toks[2])
+        toks = toks[:1] + toks[3:]
     sub = toks[1] if len(toks) > 1 else ""
     if sub == "add":
         for t in toks[2:]:
