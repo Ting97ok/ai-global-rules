@@ -422,6 +422,30 @@ class StopCheck(unittest.TestCase):
                 else:
                     self.assertEqual("", stdout.strip(), stdout)
 
+    def test_스킬_본문과_훅_되먹임은_턴을_나누지_않는다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        # 실제 기록에서 두 행은 isMeta 로 표시된다
+        skill = {"type": "user", "isMeta": True, "message": {"role": "user", "content": [
+            {"type": "text", "text": "Base directory for this skill: /Users/x/.claude/skills/doc-writing\n\n# 문서 작성"}]}}
+        feedback = {"type": "user", "isMeta": True, "message": {
+            "role": "user", "content": "Stop hook feedback:\n[stop-check] 조회 명령을 사용자에게 시키지 않는다"}}
+        cases = {
+            "스킬 본문 앞의 상태 확인": (status + [skill], ""),
+            "훅 되먹임 앞의 상태 확인": (status + [feedback], ""),
+            "스킬 본문 앞의 빨간 테스트": (red + status + [skill], "GREEN"),
+            "! 명령 뒤에는 상태를 다시 확인한다": (status + [user_command('cd /repo && git commit -m "[Test] x"')],
+                                     "상태를 확인"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
 CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
