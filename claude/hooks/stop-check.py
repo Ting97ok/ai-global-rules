@@ -39,13 +39,14 @@ from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks,
                      is_test_run, load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
-GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
-STATE_CHECK = re.compile(r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(status|log|diff|branch|rev-parse)\b"""
-                         r"|\bgh\s+pr\s+(view|list|status)\b")
-EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
-COMMIT = re.compile(r"\bgit\s+commit\b")
+# git 과 하위 명령 사이에 오는 `-C 경로`. 따옴표로 감싼 경로도 받는다
+GIT = r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?"""
+GIT_ACTION = re.compile(GIT + r"(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
+STATE_CHECK = re.compile(GIT + r"(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+EMPTY_COMMIT = re.compile(GIT + r"commit\b[^\n]*--allow-empty")
+COMMIT = re.compile(GIT + r"commit\b")
 GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
-GIT_PUSH = re.compile(r"\bgit\s+push\b")
+GIT_PUSH = re.compile(GIT + r"push\b")
 GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
 BASH_BLOCK = re.compile(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", re.S)
