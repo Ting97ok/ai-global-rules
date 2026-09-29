@@ -35,17 +35,18 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, human_message, is_document,
-                     is_test_run, load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, expand_word, human_message,
+                     is_document, is_test_run, load_rows, run_failed, said_since_last_message, shell_command,
+                     shell_env, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
 # git 과 하위 명령 사이에 오는 `-C 경로`. 따옴표로 감싼 경로도 받는다
-GIT = r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?"""
+GIT = r"""\bgit\s+(?:-C\s+(?P<dir>"[^"]*"|'[^']*'|\S+)\s+)?"""
 GIT_ACTION = re.compile(GIT + r"(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
 STATE_CHECK = re.compile(GIT + r"(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
 EMPTY_COMMIT = re.compile(GIT + r"commit\b[^\n]*--allow-empty")
 COMMIT = re.compile(GIT + r"commit\b")
-GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
+GIT_ADD = re.compile(GIT + r"add\s+(?P<paths>[^;&|\n]+)")
 GIT_PUSH = re.compile(GIT + r"push\b")
 GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
@@ -61,10 +62,14 @@ def staged_documents(block):
     커밋 명령은 인덱스를 비운 채 `git add 경로 && git commit` 으로 내므로, 스테이징된 것만 보면 검사가 걸리지 않는다.
     """
     cds = cd_targets(block)
-    if not cds:
+    repo = cds[0][1] if cds else ""
+    given = COMMIT.search(block)["dir"]
+    if given:
+        # git -C 경로 commit 은 그 경로에서 커밋한다
+        repo = os.path.join(repo, expand_word(given, shell_env(block)))
+    if not repo:
         return []
-    repo = cds[0][1]
-    adding = [p for args in GIT_ADD.findall(block) for p in shlex.split(args) if not p.startswith("-")]
+    adding = [p for m in GIT_ADD.finditer(block) for p in shlex.split(m["paths"]) if not p.startswith("-")]
 
     def git(*args):
         return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
