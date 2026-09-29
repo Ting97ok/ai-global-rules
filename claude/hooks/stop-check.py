@@ -186,8 +186,8 @@ def is_human_turn(row):
             return False
         # 도구가 끼워 넣은 메시지도 user 역할로 들어온다. 훅 되먹임·플러그인 안내가 그렇다
         return not INJECTED.search(as_text(p.get("content")))
-    # 스킬 본문·훅 되먹임은 isMeta 로 표시된다. 사람 발화가 아니다
-    if row.get("type") != "user" or row.get("isMeta"):
+    # 스킬 본문·훅 되먹임(isMeta)과 컴팩트 요약(isCompactSummary)은 사람 발화가 아니다
+    if row.get("type") != "user" or row.get("isMeta") or row.get("isCompactSummary"):
         return False
     blocks = content_blocks(row)
     return any(b.get("type") == "text" and b.get("text", "").strip() for b in blocks) \
