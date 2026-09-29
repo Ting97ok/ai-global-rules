@@ -465,6 +465,30 @@ class StopCheck(unittest.TestCase):
                 else:
                     self.assertEqual("", stdout.strip(), stdout)
 
+    def test_다른_전역_옵션과_반복한_C_도_git_명령으로_본다(self):
+        message = '-m "[Feat] 바꾼다"'
+        cases = {
+            "-c 가 앞선 커밋 명령": ([], f"git -c user.name=x commit {message}", "상태를 확인"),
+            "-C 를 두 번 준 커밋 명령": ([], f"git -C /work -C repo commit {message}", "상태를 확인"),
+            "--no-pager 로 상태를 확인한 뒤 커밋 명령": (
+                [bash_call("s1", "git --no-pager log --oneline -2"), bash_result("s1", "abc 커밋")],
+                f"cd /repo && git commit {message}", ""),
+        }
+        for name, (before, command, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("커밋 명령 줘"), *before, answer(f"```bash\n{command}\n```\n")]
+                stdout = run(transcript(rows, folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+        with self.subTest(name="-C 를 두 번 준 문서 커밋"), tempfile.TemporaryDirectory() as folder:
+            repo, doc = staged_repo(folder, "docs/plan.html", 60)
+            rows = [human("계획 문서 커밋 명령 줘"), write_call("w1", doc),
+                    bash_call("s1", f"git -C {folder} -C repo status --short"), bash_result("s1", "A  docs/plan.html"),
+                    answer(f'```bash\ngit -C {folder} -C repo commit -m "[Docs] 계획 문서"\n```\n')]
+            self.assertIn("plan.html", run(transcript(rows, folder)).stdout)
+
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
 CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
