@@ -6,7 +6,7 @@
      제외한다) 2번의 커밋·푸시·PR 명령이 없는 블록. 확인해야 할 내용은 답변에 직접 포함한다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 제시하면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 실행하지 않은 것.
-     `git -C 경로 status` 처럼 경로를 지정한 상태 확인도 포함한다.
+     `git -C 경로 commit`·`git -C 경로 status` 처럼 경로를 지정한 명령도 포함한다.
   3. 이번 턴의 마지막 테스트 실행이 실패했는데 2번의 커밋·푸시·PR 명령을 제시하는 것. 한 사이클은 GREEN 까지 진행한다(「TDD」).
      내용이 없는 빈 커밋(--allow-empty)은 제외한다. 브랜치를 열어 드래프트 PR 을 생성하는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 진행하는 것이 정상이라 마지막 실행만 확인한다.
@@ -56,8 +56,9 @@ BIG_CHANGE = 50
 
 
 def staged_documents(block):
-    """커밋 명령 앞의 `cd 저장소` 에서 커밋될 문서 가운데 새 파일이거나 크게 고친 것의 절대 경로를 낸다.
+    """커밋 명령이 커밋할 저장소에서 새 파일이거나 크게 고친 문서의 절대 경로를 낸다.
 
+    저장소는 커밋 명령 앞의 `cd 경로` 에 커밋 명령의 `git -C 경로` 를 이어 붙여 결정한다.
     이미 스테이징된 것에 더해 같은 명령의 `git add` 가 올릴 것도 본다.
     커밋 명령은 인덱스를 비운 채 `git add 경로 && git commit` 으로 내므로, 스테이징된 것만 보면 검사가 걸리지 않는다.
     """
@@ -65,7 +66,6 @@ def staged_documents(block):
     repo = cds[0][1] if cds else ""
     given = COMMIT.search(block)["dir"]
     if given:
-        # git -C 경로 commit 은 그 경로에서 커밋한다
         repo = os.path.join(repo, expand_word(given, shell_env(block)))
     if not repo:
         return []
