@@ -69,6 +69,14 @@ prefix_rule(
     justification = "폴더를 통째로 지운다",
 )
 
+# git 전역 옵션 뒤에는 경로나 값이 와서 하위 명령의 자리가 정해지지 않는다. 막는 대신 실행 전에 묻는다
+prefix_rule(
+    pattern = ["git", ["-C", "-c", "--no-pager"]],
+    decision = "prompt",
+    justification = "전역 옵션 뒤의 하위 명령은 규칙으로 확인할 수 없다",
+)
+
 # 옮기지 못한 것. prefix_rule 은 인자를 앞에서부터 맞춰서, 올 수 있는 자리를 하나씩 적어야 한다.
 # - `git push mirror --force` 처럼 origin·upstream 이 아닌 원격 이름.
 # - `rm -i -f -r` 처럼 깃발이 셋 이상으로 갈린 꼴.
+# - `git --git-dir=경로 reset` 처럼 위 목록에 없는 git 전역 옵션 뒤의 명령.
