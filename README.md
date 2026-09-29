@@ -35,7 +35,7 @@ Claude Code 와 Codex 를 사용하며 결정한 개인 작업 규칙과 그 규
 
 ## 자동 검사 범위
 
-규칙 문서만으로는 지시를 강제할 수 없다. 훅은 정해진 조건에서 실행된다. 그래서 반드시 지켜야 할 항목은 훅으로 검사한다. 되돌리기 어려운 명령은 권한 규칙으로 차단한다.
+규칙 문서만으로는 지시를 강제할 수 없다. 훅은 정해진 조건에서 실행된다. 그래서 반드시 지켜야 할 항목은 훅으로 검사한다. 되돌리기 어려운 명령은 권한 규칙으로 차단한다. `git -C 경로 reset` 처럼 전역 옵션을 준 git 명령도 차단한다.
 
 심층 인터뷰는 Claude 가 문서를 작성하거나 수정하기 전에 누가 읽을 문서인지와 문체, 담을 내용을 개발자에게 질문하는 절차다. 독자 테스트는 문서 사본만 읽는 Codex 에 질문에 답하게 해 빠진 설명과 필요 없는 글을 찾는 절차다. 둘 다 [doc-writing](claude/skills/doc-writing/SKILL.md) 에 기록되어 있다.
 
@@ -45,7 +45,7 @@ Claude Code 와 Codex 를 사용하며 결정한 개인 작업 규칙과 그 규
 |---|---|
 | `git-guard.py` | `git add -A`, 커밋 접두사, AI 도구 서명(`Co-Authored-By: Claude` 같은 줄), 병합 방식, PR 본문 항목 |
 | `commit-checkpoint.py` | 테스트가 통과했는데 커밋하지 않은 변경이 남은 상태.<br>이번 세션에서 수정한 파일만 센다 |
-| `stop-check.py` | 개발자에게 조회 명령 실행 요청, 상태 확인 없는 커밋 명령, 테스트가 실패한 상태의 커밋 명령, 새로 작성하거나 크게 수정한 문서를 독자 테스트 없이 커밋하려는 것 |
+| `stop-check.py` | 개발자에게 조회 명령 실행 요청, 상태 확인 없는 커밋 명령, 테스트가 실패한 상태의 커밋 명령, 새로 작성하거나 크게 수정한 문서를 독자 테스트 없이 커밋하려는 것, 교차 검증의 Codex 작업을 기록 도구 없이 호출한 것, 기록한 교차 검증 항목을 답변에 보고하지 않은 것 |
 | `prose-check.py` | 문서의 전각 대시 문장 연결, 표 칸 한 조각의 두 문장, 연결어미(지만·는데·면서) 뒤 쉼표, 질문형 제목, 제목 속 개수 |
 | `doc-skill-guard.py` | 문서를 작성하거나 수정하기 전에 `doc-writing` 과 심층 인터뷰 스킬을 호출했는지.<br>확장자와 내용으로 문서를 구분하고 셸 명령으로 수정할 때도 확인한다 |
 | `memory-note.py` | 메모리에 둘 내용인지 다시 확인하게 한다 |
@@ -84,11 +84,11 @@ Claude Code 와 Codex 를 사용하며 결정한 개인 작업 규칙과 그 규
 
 Codex 에서는 AGENTS.md 가 문서 작업에 스킬을 먼저 호출하라고 지시한다. 누락을 자동으로 차단하지는 않는다.
 
-되돌리기 어려운 명령은 훅이 아니라 권한 규칙으로 차단한다. [codex/claude-deny.rules](codex/claude-deny.rules) 가 `~/.codex/rules/` 로 들어가 `git reset`·`git clean`·`rm -rf` 등 열한 가지를 거절한다. 거절할 때 규칙에 기록한 이유를 그대로 보여 준다. 인자를 앞에서부터 비교하는 방식이라 플래그가 올 수 있는 위치를 하나씩 기록해야 한다. `git push mirror --force` 처럼 원격 이름이 다른 것은 차단하지 못한다. 차단하지 못하는 명령은 규칙 파일 끝에 기록했다.
+되돌리기 어려운 명령은 훅이 아니라 권한 규칙으로 차단한다. [codex/claude-deny.rules](codex/claude-deny.rules) 가 `~/.codex/rules/` 로 들어가 `git reset`·`git clean`·`rm -rf` 등 열한 가지를 거절한다. 거절할 때 규칙에 기록한 이유를 그대로 보여 준다. 인자를 앞에서부터 비교하는 방식이라 플래그가 올 수 있는 위치를 하나씩 기록해야 한다. `git push mirror --force` 처럼 원격 이름이 다른 것은 차단하지 못한다. 차단하지 못하는 명령은 규칙 파일 끝에 기록했다. git 전역 옵션이 오면 하위 명령의 자리가 달라져 규칙에 미리 기록할 수 없다. 그래서 `git -C`·`git -c`·`git --no-pager` 로 시작하는 명령은 거절하지 않고 실행 전에 개발자에게 승인을 요청한다.
 
 저장소마다 결정한 규칙은 사본을 만들지 않는다. `config.toml` 에 `project_doc_fallback_filenames = ["CLAUDE.md"]` 를 두면 Codex 가 그 저장소의 `CLAUDE.md` 를 직접 읽는다. 사본을 두면 원본을 수정해도 사본은 갱신되지 않는다. 설정이 빠졌는지는 `codex-sync.sh` 가 확인한다.
 
-테스트는 파일을 하나씩 직접 실행한다. 훅은 `claude/hooks/tests/test_*.py` 여섯 개를 `python3 claude/hooks/tests/test_stop_check.py` 처럼 실행한다. Codex 연결은 `sh tests/codex-sync.test.sh`, 권한 규칙은 `sh tests/codex-rules.test.sh` 다.
+테스트는 파일을 하나씩 직접 실행한다. 훅은 `claude/hooks/tests/test_*.py` 여섯 개를 `python3 claude/hooks/tests/test_stop_check.py` 처럼 실행한다. Codex 연결은 `sh tests/codex-sync.test.sh`, 권한 규칙은 `sh tests/codex-rules.test.sh`, 복사 스크립트는 `sh tests/sync.test.sh` 다.
 
 </details>
 

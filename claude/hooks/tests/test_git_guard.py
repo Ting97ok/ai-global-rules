@@ -5,11 +5,13 @@
 """
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HOOK = Path(__file__).resolve().parent.parent / "git-guard.py"
 _spec = importlib.util.spec_from_file_location("git_guard", HOOK)
@@ -123,6 +125,35 @@ class TargetRepo(unittest.TestCase):
             result = run(f"cd {there} && gh pr edit 4 --body-file body.md", here)
             self.assertEqual(2, result.returncode, result.stdout or "막지 않았다")
             self.assertIn("전각 대시", result.stderr)
+
+    def test_전역_옵션을_준_git_명령도_검사하고_C_경로의_저장소를_본다(self):
+        with tempfile.TemporaryDirectory() as here:
+            work = pushed_repo(here)
+            subprocess.run(["git", "switch", "-q", "-c", "feat/x"], cwd=work, check=True)
+            (work / "a.java").write_text("class A { int x; }\n", encoding="utf-8")
+            subprocess.run(["git", "add", "a.java"], cwd=work, check=True)
+            commit(work, "[Feat] 브랜치 첫 커밋")
+            # 열린 PR 이 없는 브랜치처럼 답하는 gh
+            gh = Path(here) / "bin" / "gh"
+            gh.parent.mkdir()
+            gh.write_text('#!/bin/sh\necho "no pull requests found for branch" >&2\nexit 1\n', encoding="utf-8")
+            gh.chmod(0o755)
+            cases = {
+                "경로 없는 git add": (f"git -C {work} add -A", "경로를 명시한다"),
+                "접두사 없는 커밋": (f'git -C {work} commit -m "접두사 없음"', "커밋 제목"),
+                "+ refspec 푸시": (f"git -C {work} push origin +feat/x", "강제 푸시"),
+                "PR 없는 브랜치의 두 번째 커밋": (f'git -C {work} commit -m "[Feat] 둘째"', "드래프트 PR"),
+                "-c 가 앞선 접두사 없는 커밋": ('git -c user.name=x commit -m "접두사 없음"', "커밋 제목"),
+                "--no-pager 가 앞선 경로 없는 git add": (f"git --no-pager -C {work} add -A", "경로를 명시한다"),
+                "-c 와 -C 를 준 PR 없는 브랜치의 두 번째 커밋":
+                    (f'git -c core.x=y -C {work} commit -m "[Feat] 둘째"', "드래프트 PR"),
+            }
+            with mock.patch.dict(os.environ, {"PATH": f"{gh.parent}{os.pathsep}{os.environ['PATH']}"}):
+                for name, (command, expected) in cases.items():
+                    with self.subTest(name=name):
+                        result = run(command, here)
+                        self.assertEqual(2, result.returncode, result.stderr or "막지 않았다")
+                        self.assertIn(expected, result.stderr)
 
 
 if __name__ == "__main__":

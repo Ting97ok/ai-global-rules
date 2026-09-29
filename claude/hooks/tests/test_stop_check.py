@@ -250,6 +250,27 @@ class ReaderTest(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("plan.html", result.stdout)
 
+    def test_git_C_로_경로를_준_커밋_명령도_독자_테스트를_요구한다(self):
+        cases = {
+            "스테이징한 새 문서": ("", True, "git -C {repo} commit"),
+            "git add 로 올리는 새 문서": ("", False, "git -C {repo} add docs/plan.html && git -C {repo} commit"),
+            "따옴표로 감싼 공백 경로": ("work space", True, 'git -C "{repo}" commit'),
+        }
+        for name, (parent, stage, command) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                (Path(folder) / parent).mkdir(exist_ok=True)
+                repo, doc = staged_repo(Path(folder) / parent, "docs/plan.html", 60, stage=stage)
+                rows = [
+                    human("계획 문서 커밋 명령 줘"),
+                    write_call("w1", doc),
+                    bash_call("s1", f'git -C "{repo}" status --short'),
+                    bash_result("s1", "?? docs/plan.html"),
+                    answer(f'```bash\n{command.format(repo=repo)} -m "[Docs] 계획 문서"\n```\n'),
+                ]
+                result = run(transcript(rows, folder))
+                self.assertIn("block", result.stdout)
+                self.assertIn("plan.html", result.stdout)
+
     def test_한_문서의_독자_테스트는_다른_문서에_쓰지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             repo, doc = staged_repo(folder, "docs/plan.html", 60)
@@ -376,6 +397,116 @@ class StopCheck(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             result = run(transcript(rows, folder))
             self.assertEqual("", result.stdout.strip(), result.stdout)
+
+    def test_git_C_로_경로를_준_커밋_푸시_명령도_검사한다(self):
+        status = [bash_call("s1", "git -C /repo status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        comment = [bash_call("g1", "gh pr comment 13 --body-file /private/tmp/s/comment.md"),
+                   bash_result("g1", "https://github.com/o/r/pull/13#issuecomment-1")]
+        commit = 'git -C /repo add a.java && git -C /repo commit -m "[Feat] 바꾼다"'
+        review = commit + ' -m "검토: 지적 → 바뀐 것 (https://github.com/o/r/pull/13#issuecomment-1)"'
+        cases = {
+            "상태 확인 없는 커밋 명령": ([], [commit], "상태를 확인"),
+            "검토 줄에 댓글 주소가 없는 커밋 명령": (status, [commit + ' -m "검토: 지적 → 바뀐 것"'], "댓글 주소"),
+            "댓글 뒤에 푸시 블록이 없는 커밋 명령": (comment + status, [review], "git push"),
+            "댓글 뒤에 푸시 블록도 준 커밋 명령": (comment + status, [review, "git -C /repo push"], ""),
+            "빨간 상태의 빈 커밋 명령": (red + status, ['git -C /repo commit --allow-empty -m "[Fix] 브랜치 시작"'], ""),
+        }
+        for name, (before, blocks, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                text = "".join(f"```bash\n{b}\n```\n\n" for b in blocks)
+                stdout = run(transcript([human("커밋 명령 줘"), *before, answer(text)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
+    def test_스킬_본문과_훅_되먹임은_턴을_나누지_않는다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        # 실제 기록에서 두 행은 isMeta 로 표시된다
+        skill = {"type": "user", "isMeta": True, "message": {"role": "user", "content": [
+            {"type": "text", "text": "Base directory for this skill: /Users/x/.claude/skills/doc-writing\n\n# 문서 작성"}]}}
+        feedback = {"type": "user", "isMeta": True, "message": {
+            "role": "user", "content": "Stop hook feedback:\n[stop-check] 조회 명령을 사용자에게 시키지 않는다"}}
+        cases = {
+            "스킬 본문 앞의 상태 확인": (status + [skill], ""),
+            "훅 되먹임 앞의 상태 확인": (status + [feedback], ""),
+            "스킬 본문 앞의 빨간 테스트": (red + status + [skill], "GREEN"),
+            "! 명령 뒤에는 상태를 다시 확인한다": (status + [user_command('cd /repo && git commit -m "[Test] x"')],
+                                     "상태를 확인"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
+    def test_컴팩트_요약은_턴을_나누지_않는다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        # 실제 기록의 컴팩트 요약 행에는 isMeta 가 없다
+        summary = {"type": "user", "isCompactSummary": True, "isVisibleInTranscriptOnly": True, "message": {
+            "role": "user", "content": "This session is being continued from a previous conversation."}}
+        cases = {
+            "컴팩트 요약 앞의 상태 확인": (status + [summary], ""),
+            "컴팩트 요약 앞의 빨간 테스트": (red + status + [summary], "GREEN"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
+    def test_다른_전역_옵션과_반복한_C_도_git_명령으로_본다(self):
+        message = '-m "[Feat] 바꾼다"'
+        cases = {
+            "-c 가 앞선 커밋 명령": ([], f"git -c user.name=x commit {message}", "상태를 확인"),
+            "-C 를 두 번 준 커밋 명령": ([], f"git -C /work -C repo commit {message}", "상태를 확인"),
+            "--no-pager 로 상태를 확인한 뒤 커밋 명령": (
+                [bash_call("s1", "git --no-pager log --oneline -2"), bash_result("s1", "abc 커밋")],
+                f"cd /repo && git commit {message}", ""),
+        }
+        for name, (before, command, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                rows = [human("커밋 명령 줘"), *before, answer(f"```bash\n{command}\n```\n")]
+                stdout = run(transcript(rows, folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+        with self.subTest(name="-C 를 두 번 준 문서 커밋"), tempfile.TemporaryDirectory() as folder:
+            repo, doc = staged_repo(folder, "docs/plan.html", 60)
+            rows = [human("계획 문서 커밋 명령 줘"), write_call("w1", doc),
+                    bash_call("s1", f"git -C {folder} -C repo status --short"), bash_result("s1", "A  docs/plan.html"),
+                    answer(f'```bash\ngit -C {folder} -C repo commit -m "[Docs] 계획 문서"\n```\n')]
+            self.assertIn("plan.html", run(transcript(rows, folder)).stdout)
+
+    def test_작업_알림_앞에서_실패한_테스트도_조건_3_이_확인한다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        green = [bash_call("t2", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+                 bash_result("t2", "Ran 1 test\n\nOK")]
+        cases = {
+            "작업 알림 앞의 빨간 테스트": (red + [notification("c1")] + status, "GREEN"),
+            "작업 알림 뒤에 다시 통과한 테스트": (red + [notification("c1")] + green + status, ""),
+            "작업 알림 앞의 상태 확인": (status + [notification("c1")], "상태를 확인"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
 
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"

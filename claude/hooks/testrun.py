@@ -17,16 +17,20 @@ RUNNER = re.compile(
     r"|(npm|yarn|pnpm|bun)\s+(run\s+)?(test|build|check|lint)\b"
     r"|make\s+(test|check|build)\b"
     r"|python3?\s+-m\s+(unittest|pytest)"
-    r"|python3?\s+\S*test_\w+\.py)")
+    r"|python3?\s+\S*test_\w+\.py"
+    r"|(?:ba)?sh\s+\S*\.test\.sh\b)")
 COMMAND_BREAK = re.compile(r"&&|\|\||[;|()\n]")
-# for f in tests/test_*.py; do python3 "$f"; done 처럼 테스트 파일을 돌며 실행하는 꼴
-TEST_LOOP = re.compile(r"\bfor\s+(\w+)\s+in\s+[^;\n]*\btest_[^;\n]*[;\n]\s*do\s+(?:\S*/)?python3?\s+\"?\$\{?\1\b")
+# for f in tests/test_*.py; do python3 "$f"; done 처럼 테스트 파일을 돌며 실행하는 꼴.
+# 반복문 안에서 python3 앞에 다른 명령이 와도 done 앞까지 찾는다. 셸 테스트(*.test.sh)를 sh 로 돌리는 반복문도 센다
+TEST_LOOP = re.compile(r"\bfor\s+(\w+)\s+in\s+[^;\n]*(?:\btest_|\.test\.sh)[^;\n]*[;\n]\s*do\b"
+                       r"(?:(?!\bdone\b).)*?\b(?:python3?|(?:ba)?sh)\s+\"?\$\{?\1\b", re.S)
 
-# 실행조차 못 한 것도 실패다. 통과로 세면 「테스트가 통과했다」고 단정하게 된다
+# 실행조차 못 한 것도 실패다. 통과로 세면 「테스트가 통과했다」고 단정하게 된다.
+# 「실패 있음」은 셸 테스트(*.test.sh)가 마지막 줄에 내는 실패 문구다
 FAILURE = re.compile(
     r"BUILD FAILED|\bFAILED\b|\d+\s+failed|Tests?\s+failed|FAILURE:|\berror:"
     r"|command not found|No such file or directory|ModuleNotFoundError"
-    r"|can't open file|is not recognized as", re.IGNORECASE)
+    r"|can't open file|is not recognized as|실패 있음", re.IGNORECASE)
 
 
 def as_text(value):

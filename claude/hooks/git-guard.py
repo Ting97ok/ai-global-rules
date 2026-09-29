@@ -17,6 +17,7 @@
  13. 「사용자 피드백:」 줄이 두 번 이상인 댓글          피드백은 건마다 댓글을 별도로 게시한다
  14. 결정 댓글의 한 줄에 문장이 둘 이상               줄마다 한 문장으로 요약한다. 「다.」로 끝나는 문장을 집계한다
 
+`git -C 경로 …` 는 그 경로에서 실행한 git 명령으로 보고 같은 기준으로 검사한다. `-c 이름=값` 과 긴 옵션은 건너뛰고 하위 명령을 읽는다.
 이 훅은 Claude 가 Bash 도구로 실행하는 명령에만 적용된다. 사용자가 `!` 로 실행하는 커밋은 stop-check 가 추천 명령에서 확인한다.
 종료 코드 2 + stderr 가 차단이다. 판단이 필요한 것은 여기 두지 않는다.
 """
@@ -195,6 +196,16 @@ def unlisted_changes(body, cwd):
 
 
 def check_git(toks, cwd):
+    # 전역 옵션을 건너뛰고 하위 명령을 읽는다. git -C 경로 … 는 그 경로에서 실행한 git 명령과 같다
+    while len(toks) > 1 and toks[1].startswith("-"):
+        if toks[1] in ("-C", "-c") and len(toks) > 2:
+            if toks[1] == "-C":
+                cwd = os.path.join(cwd, toks[2])
+            toks = toks[:1] + toks[3:]
+        elif toks[1].startswith("--"):
+            toks = toks[:1] + toks[2:]
+        else:
+            break
     sub = toks[1] if len(toks) > 1 else ""
     if sub == "add":
         for t in toks[2:]:

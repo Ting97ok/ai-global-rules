@@ -6,7 +6,7 @@
      제외한다) 2번의 커밋·푸시·PR 명령이 없는 블록. 확인해야 할 내용은 답변에 직접 포함한다.
   2. 커밋·푸시·PR 명령(git add/commit/push, gh pr create/edit/ready/merge/comment)을 제시하면서
      이번 턴에 상태 확인(git status / git log / git diff / git branch / gh pr view|list)을 실제로 실행하지 않은 것.
-     `git -C 경로 status` 처럼 경로를 지정한 상태 확인도 포함한다.
+     `git -C 경로 commit`·`git -c 이름=값 status` 처럼 전역 옵션을 준 명령도 포함한다.
   3. 이번 턴의 마지막 테스트 실행이 실패했는데 2번의 커밋·푸시·PR 명령을 제시하는 것. 한 사이클은 GREEN 까지 진행한다(「TDD」).
      내용이 없는 빈 커밋(--allow-empty)은 제외한다. 브랜치를 열어 드래프트 PR 을 생성하는 자리라 사이클과 무관하다.
      한 턴에서 RED → 수정 → GREEN 을 진행하는 것이 정상이라 마지막 실행만 확인한다.
@@ -26,6 +26,9 @@
      보고를 마친 뒤 사용자가 `!` 명령을 실행해도 같은 제목을 다시 요구하지 않는다.
   8·9 는 codex-cross-check 「진행」·「보고」다. 교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 마지막 요청이다.
   요청은 작업 알림·스킬 본문·훅 되먹임·`!` 명령을 제외한 사용자 메시지다. 판정은 testrun human_message 가 한다.
+  2 의 이번 턴은 마지막 사람 발화 뒤다. 사람 발화는 요청·`!` 명령·작업 알림이다.
+  3 의 이번 턴은 작업 알림에서 나누지 않는다. 백그라운드 작업을 기다리는 동안에도 알림 앞에서 실패한 테스트가 마지막 테스트 실행이다.
+  isMeta 로 표시된 스킬 본문·훅 되먹임과 isCompactSummary 로 표시된 컴팩트 요약은 사람 발화가 아니다. 판정은 is_human_turn 이 한다.
 이미 이 훅으로 반려된 턴(stop_hook_active)은 다시 반려하지 않는다. 무한 루프 방지.
 """
 import json
@@ -35,17 +38,22 @@ import shlex
 import subprocess
 import sys
 
-from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, human_message, is_document,
-                     is_test_run, load_rows, run_failed, said_since_last_message, shell_command, without_heredoc_bodies)
+from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks, expand_word, human_message,
+                     is_document, is_test_run, load_rows, run_failed, said_since_last_message, shell_command,
+                     shell_env, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
-GIT_ACTION = re.compile(r"\bgit\s+(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
-STATE_CHECK = re.compile(r"""\bgit\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(status|log|diff|branch|rev-parse)\b"""
-                         r"|\bgh\s+pr\s+(view|list|status)\b")
-EMPTY_COMMIT = re.compile(r"\bgit\s+commit\b[^\n]*--allow-empty")
-COMMIT = re.compile(r"\bgit\s+commit\b")
-GIT_ADD = re.compile(r"\bgit\s+add\s+([^;&|\n]+)")
-GIT_PUSH = re.compile(r"\bgit\s+push\b")
+# git 과 하위 명령 사이에 오는 전역 옵션. `-C 경로`·`-c 이름=값` 은 값을 하나 더 받고 긴 옵션은 `=` 로 값을 붙인다.
+# 따옴표로 감싼 값도 받는다
+WORD = r"""(?:"[^"]*"|'[^']*'|\S+)"""
+GIT = rf"""\bgit\s+(?:-[Cc]\s+{WORD}\s+|--[\w-]+(?:={WORD})?\s+)*"""
+C_DIR = re.compile(rf"-C\s+({WORD})")
+GIT_ACTION = re.compile(GIT + r"(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
+STATE_CHECK = re.compile(GIT + r"(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
+EMPTY_COMMIT = re.compile(GIT + r"commit\b[^\n]*--allow-empty")
+COMMIT = re.compile(GIT + r"commit\b")
+GIT_ADD = re.compile(GIT + r"add\s+(?P<paths>[^;&|\n]+)")
+GIT_PUSH = re.compile(GIT + r"push\b")
 GH_COMMENT = re.compile(r"\bgh\s+pr\s+comment\b")
 COMMENT_URL = re.compile(r"https://github\.com/\S+/(pull|issues)/\d+#issuecomment-\d+")
 BASH_BLOCK = re.compile(r"```(?:bash|sh|zsh|shell)\s*\n(.*?)```", re.S)
@@ -54,16 +62,19 @@ BIG_CHANGE = 50
 
 
 def staged_documents(block):
-    """커밋 명령 앞의 `cd 저장소` 에서 커밋될 문서 가운데 새 파일이거나 크게 고친 것의 절대 경로를 낸다.
+    """커밋 명령이 커밋할 저장소에서 새 파일이거나 크게 고친 문서의 절대 경로를 낸다.
 
+    저장소는 커밋 명령 앞의 `cd 경로` 에 커밋 명령의 `git -C 경로` 를 차례로 이어 붙여 결정한다.
     이미 스테이징된 것에 더해 같은 명령의 `git add` 가 올릴 것도 본다.
     커밋 명령은 인덱스를 비운 채 `git add 경로 && git commit` 으로 내므로, 스테이징된 것만 보면 검사가 걸리지 않는다.
     """
     cds = cd_targets(block)
-    if not cds:
+    repo = cds[0][1] if cds else ""
+    for given in C_DIR.findall(COMMIT.search(block)[0]):
+        repo = os.path.join(repo, expand_word(given, shell_env(block)))
+    if not repo:
         return []
-    repo = cds[0][1]
-    adding = [p for args in GIT_ADD.findall(block) for p in shlex.split(args) if not p.startswith("-")]
+    adding = [p for m in GIT_ADD.finditer(block) for p in shlex.split(m["paths"]) if not p.startswith("-")]
 
     def git(*args):
         return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
@@ -178,7 +189,8 @@ def is_human_turn(row):
             return False
         # 도구가 끼워 넣은 메시지도 user 역할로 들어온다. 훅 되먹임·플러그인 안내가 그렇다
         return not INJECTED.search(as_text(p.get("content")))
-    if row.get("type") != "user":
+    # 스킬 본문·훅 되먹임(isMeta)과 컴팩트 요약(isCompactSummary)은 사람 발화가 아니다
+    if row.get("type") != "user" or row.get("isMeta") or row.get("isCompactSummary"):
         return False
     blocks = content_blocks(row)
     return any(b.get("type") == "text" and b.get("text", "").strip() for b in blocks) \
@@ -198,6 +210,10 @@ def is_request(row):
 
 def is_user_command(row):
     return row.get("type") == "user" and row_text(row).lstrip().startswith("<bash-input>")
+
+
+def is_notification(row):
+    return row.get("type") == "user" and row_text(row).lstrip().startswith("<task-notification>")
 
 
 def commands_in(rows):
@@ -225,6 +241,11 @@ def answer_before(rows, index):
     return ""
 
 
+def after_last_request(rows):
+    """마지막 요청 다음 줄의 번호. 요청이 없으면 0 이다."""
+    return max((i + 1 for i, r in enumerate(rows) if is_request(r)), default=0)
+
+
 def comment_problems(rows, last_text, blocks):
     """「브랜치·PR 흐름」의 댓글 판단과 댓글 뒤의 커밋·푸시 명령을 본다.
 
@@ -234,10 +255,10 @@ def comment_problems(rows, last_text, blocks):
     commits = [b for b in blocks if COMMIT.search(b)]
     if any("검토:" in b and not COMMENT_URL.search(b) for b in commits):
         problems.append("`검토:` 줄에는 그 결정을 남긴 PR 댓글 주소를 단다. 댓글을 먼저 올리고 그 주소를 붙인다")
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    if not requests:
+    start = after_last_request(rows)
+    if not start:
         return problems
-    since = rows[requests[-1] + 1:]
+    since = rows[start:]
     # 스크립트 heredoc 안에 적힌 명령 글자는 실행한 명령이 아니다
     comment_rows = [i for i, r in enumerate(since)
                     if any(GH_COMMENT.search(without_heredoc_bodies(c)) for c in commands_in([r]))]
@@ -249,7 +270,7 @@ def comment_problems(rows, last_text, blocks):
                         "`cd {저장소} && git push` 블록을 따로 낸다")
     if commented or "댓글" in last_text or any(is_user_command(r) for r in since):
         return problems
-    if any(COMMIT.search(b) for b in BASH_BLOCK.findall(answer_before(rows, requests[-1]))):
+    if any(COMMIT.search(b) for b in BASH_BLOCK.findall(answer_before(rows, start - 1))):
         problems.append("커밋 명령을 낸 답 뒤에 받은 요청이다. 사용자가 AI 결정에 반박해 방향이 바뀌었으면 "
                         "「댓글 → 커밋 → 푸시」 순서로 가고, 아니면 댓글 대상이 아닌 이유를 답변에 한 줄로 적는다")
     return problems
@@ -260,9 +281,7 @@ def direct_codex_tasks(rows):
 
     교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 이번 턴이 아니라 마지막 요청이다.
     """
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    since = rows[requests[-1] + 1:] if requests else rows
-    return [c for c in map(without_heredoc_bodies, commands_in(since))
+    return [c for c in map(without_heredoc_bodies, commands_in(rows[after_last_request(rows):]))
             if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
 
 
@@ -279,8 +298,7 @@ def unreported_items(rows):
 
     보고를 마친 뒤 사용자가 `!` 명령을 실행하면 다음 답변도 같은 요청 범위다. 마지막 답변만 보면 같은 제목을 다시 요구하게 된다.
     """
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    start = requests[-1] + 1 if requests else 0
+    start = after_last_request(rows)
     missing = []
     for i in range(start, len(rows)):
         for command in map(without_heredoc_bodies, commands_in([rows[i]])):
@@ -307,27 +325,31 @@ def main():
     if not rows:
         return
 
-    # 마지막 사람 발화 이후의 턴만 본다
-    start = 0
+    # 마지막 사람 발화 이후의 턴만 본다. 조건 3 의 테스트 실행은 작업 알림에서 끊지 않는다.
+    # 백그라운드 작업을 기다리는 동안에도 알림 앞에서 실패한 테스트가 마지막 테스트 실행이다
+    start = test_start = 0
     for i, r in enumerate(rows):
         if is_human_turn(r):
             start = i
-    turn = rows[start + 1:]
+            if not is_notification(r):
+                test_start = i
 
     ran_commands, last_text = [], ""
     commands, last_test_failed = {}, False
-    for r in turn:
+    for i in range(test_start + 1, len(rows)):
+        r, in_turn = rows[i], i > start
         p = codex_payload(r)
         if p is not None:
             t = p.get("type")
             if t == "custom_tool_call":
                 command = shell_command(p.get("input"))
-                ran_commands.append(command)
+                if in_turn:
+                    ran_commands.append(command)
                 commands[p.get("call_id")] = command
             elif t == "custom_tool_call_output":
                 if is_test_run(commands.get(p.get("call_id"), "")):
                     last_test_failed = run_failed(p.get("output"))
-            elif t == "message" and p.get("role") == "assistant":
+            elif t == "message" and p.get("role") == "assistant" and in_turn:
                 last_text = as_text(p.get("content"))
             continue
         kind = r.get("type")
@@ -336,11 +358,12 @@ def main():
             for b in content_blocks(r):
                 if b.get("type") == "tool_use" and b.get("name") == "Bash":
                     command = (b.get("input") or {}).get("command", "") or ""
-                    ran_commands.append(command)
+                    if in_turn:
+                        ran_commands.append(command)
                     commands[b.get("id")] = command
                 elif b.get("type") == "text":
                     texts.append(b.get("text", ""))
-            if texts:
+            if texts and in_turn:
                 last_text = "\n".join(texts)
         elif kind == "user":
             # 테스트 실행의 결과는 종료 코드가 아니라 출력으로 본다 — 파이프를 물리면 0 으로 끝난다
