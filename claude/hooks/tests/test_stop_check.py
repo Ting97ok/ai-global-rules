@@ -446,6 +446,25 @@ class StopCheck(unittest.TestCase):
                 else:
                     self.assertEqual("", stdout.strip(), stdout)
 
+    def test_컴팩트_요약은_턴을_나누지_않는다(self):
+        status = [bash_call("s1", "cd /repo && git status --short"), bash_result("s1", " M a.java")]
+        red = [bash_call("t1", "python3 ~/.claude/hooks/tests/test_doc_skill_guard.py"),
+               bash_result("t1", "FAIL: test_x\nRan 1 test\n\nFAILED (failures=1)")]
+        # 실제 기록의 컴팩트 요약 행에는 isMeta 가 없다
+        summary = {"type": "user", "isCompactSummary": True, "isVisibleInTranscriptOnly": True, "message": {
+            "role": "user", "content": "This session is being continued from a previous conversation."}}
+        cases = {
+            "컴팩트 요약 앞의 상태 확인": (status + [summary], ""),
+            "컴팩트 요약 앞의 빨간 테스트": (red + status + [summary], "GREEN"),
+        }
+        for name, (before, expected) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                stdout = run(transcript([human("진행해"), *before, answer(COMMIT_ANSWER)], folder)).stdout
+                if expected:
+                    self.assertIn(expected, stdout)
+                else:
+                    self.assertEqual("", stdout.strip(), stdout)
+
 
 COMPANION = "node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs"
 CROSSCHECK_RUN = "python3 ~/.claude/skills/codex-cross-check/crosscheck.py run --session s1 --"
