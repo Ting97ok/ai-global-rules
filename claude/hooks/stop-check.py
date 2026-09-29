@@ -42,8 +42,11 @@ from testrun import (FAILURE, as_text, called_paths, cd_targets, content_blocks,
                      shell_env, without_heredoc_bodies)
 
 VIEW_ONLY = re.compile(r"^\s*(cat|less|more|head|tail|bat)\s|^\s*sed\s+-n\s|^\s*grep\s")
-# git 과 하위 명령 사이에 오는 `-C 경로`. 따옴표로 감싼 경로도 받는다
-GIT = r"""\bgit\s+(?:-C\s+(?P<dir>"[^"]*"|'[^']*'|\S+)\s+)?"""
+# git 과 하위 명령 사이에 오는 전역 옵션. `-C 경로`·`-c 이름=값` 은 값을 하나 더 받고 긴 옵션은 `=` 로 값을 붙인다.
+# 따옴표로 감싼 값도 받는다
+WORD = r"""(?:"[^"]*"|'[^']*'|\S+)"""
+GIT = rf"""\bgit\s+(?:-[Cc]\s+{WORD}\s+|--[\w-]+(?:={WORD})?\s+)*"""
+C_DIR = re.compile(rf"-C\s+({WORD})")
 GIT_ACTION = re.compile(GIT + r"(add|commit|push)\b|\bgh\s+pr\s+(create|edit|ready|merge|comment)\b")
 STATE_CHECK = re.compile(GIT + r"(status|log|diff|branch|rev-parse)\b|\bgh\s+pr\s+(view|list|status)\b")
 EMPTY_COMMIT = re.compile(GIT + r"commit\b[^\n]*--allow-empty")
@@ -66,8 +69,7 @@ def staged_documents(block):
     """
     cds = cd_targets(block)
     repo = cds[0][1] if cds else ""
-    given = COMMIT.search(block)["dir"]
-    if given:
+    for given in C_DIR.findall(COMMIT.search(block)[0]):
         repo = os.path.join(repo, expand_word(given, shell_env(block)))
     if not repo:
         return []
