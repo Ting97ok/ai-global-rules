@@ -250,6 +250,27 @@ class ReaderTest(unittest.TestCase):
             self.assertIn("block", result.stdout)
             self.assertIn("plan.html", result.stdout)
 
+    def test_git_C_로_경로를_준_커밋_명령도_독자_테스트를_요구한다(self):
+        cases = {
+            "스테이징한 새 문서": ("", True, "git -C {repo} commit"),
+            "git add 로 올리는 새 문서": ("", False, "git -C {repo} add docs/plan.html && git -C {repo} commit"),
+            "따옴표로 감싼 공백 경로": ("work space", True, 'git -C "{repo}" commit'),
+        }
+        for name, (parent, stage, command) in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
+                (Path(folder) / parent).mkdir(exist_ok=True)
+                repo, doc = staged_repo(Path(folder) / parent, "docs/plan.html", 60, stage=stage)
+                rows = [
+                    human("계획 문서 커밋 명령 줘"),
+                    write_call("w1", doc),
+                    bash_call("s1", f'git -C "{repo}" status --short'),
+                    bash_result("s1", "?? docs/plan.html"),
+                    answer(f'```bash\n{command.format(repo=repo)} -m "[Docs] 계획 문서"\n```\n'),
+                ]
+                result = run(transcript(rows, folder))
+                self.assertIn("block", result.stdout)
+                self.assertIn("plan.html", result.stdout)
+
     def test_한_문서의_독자_테스트는_다른_문서에_쓰지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             repo, doc = staged_repo(folder, "docs/plan.html", 60)
