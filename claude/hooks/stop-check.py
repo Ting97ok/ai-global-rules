@@ -234,6 +234,11 @@ def answer_before(rows, index):
     return ""
 
 
+def after_last_request(rows):
+    """마지막 요청 다음 줄의 번호. 요청이 없으면 0 이다."""
+    return max((i + 1 for i, r in enumerate(rows) if is_request(r)), default=0)
+
+
 def comment_problems(rows, last_text, blocks):
     """「브랜치·PR 흐름」의 댓글 판단과 댓글 뒤의 커밋·푸시 명령을 본다.
 
@@ -243,10 +248,10 @@ def comment_problems(rows, last_text, blocks):
     commits = [b for b in blocks if COMMIT.search(b)]
     if any("검토:" in b and not COMMENT_URL.search(b) for b in commits):
         problems.append("`검토:` 줄에는 그 결정을 남긴 PR 댓글 주소를 단다. 댓글을 먼저 올리고 그 주소를 붙인다")
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    if not requests:
+    start = after_last_request(rows)
+    if not start:
         return problems
-    since = rows[requests[-1] + 1:]
+    since = rows[start:]
     # 스크립트 heredoc 안에 적힌 명령 글자는 실행한 명령이 아니다
     comment_rows = [i for i, r in enumerate(since)
                     if any(GH_COMMENT.search(without_heredoc_bodies(c)) for c in commands_in([r]))]
@@ -258,7 +263,7 @@ def comment_problems(rows, last_text, blocks):
                         "`cd {저장소} && git push` 블록을 따로 낸다")
     if commented or "댓글" in last_text or any(is_user_command(r) for r in since):
         return problems
-    if any(COMMIT.search(b) for b in BASH_BLOCK.findall(answer_before(rows, requests[-1]))):
+    if any(COMMIT.search(b) for b in BASH_BLOCK.findall(answer_before(rows, start - 1))):
         problems.append("커밋 명령을 낸 답 뒤에 받은 요청이다. 사용자가 AI 결정에 반박해 방향이 바뀌었으면 "
                         "「댓글 → 커밋 → 푸시」 순서로 가고, 아니면 댓글 대상이 아닌 이유를 답변에 한 줄로 적는다")
     return problems
@@ -269,9 +274,7 @@ def direct_codex_tasks(rows):
 
     교차 검증은 백그라운드로 실행되고 작업 알림 뒤에 답이 나가므로 기준은 이번 턴이 아니라 마지막 요청이다.
     """
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    since = rows[requests[-1] + 1:] if requests else rows
-    return [c for c in map(without_heredoc_bodies, commands_in(since))
+    return [c for c in map(without_heredoc_bodies, commands_in(rows[after_last_request(rows):]))
             if CODEX_TASK.search(c) and not WRAPPED.search(c) and not READER_CWD.search(c)]
 
 
@@ -288,8 +291,7 @@ def unreported_items(rows):
 
     보고를 마친 뒤 사용자가 `!` 명령을 실행하면 다음 답변도 같은 요청 범위다. 마지막 답변만 보면 같은 제목을 다시 요구하게 된다.
     """
-    requests = [i for i, r in enumerate(rows) if is_request(r)]
-    start = requests[-1] + 1 if requests else 0
+    start = after_last_request(rows)
     missing = []
     for i in range(start, len(rows)):
         for command in map(without_heredoc_bodies, commands_in([rows[i]])):
