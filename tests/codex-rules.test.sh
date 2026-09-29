@@ -33,8 +33,13 @@ for c in "git push origin --force" "git push upstream -f" "rm -f -r build" "rm -
   [ "$(decision $c)" = "forbidden" ] && ok "$c" || no "$c"
 done
 
+echo "전역 옵션 뒤의 명령은 실행 전에 묻는다"
+for c in "git -C /x reset --hard" "git -c a=b clean -fd" "git --no-pager push --force origin"; do
+  [ "$(decision $c)" = "prompt" ] && ok "$c" || no "$c"
+done
+
 echo "못 막는 것 — 규칙 파일 끝에 적은 한계"
-for c in "git push mirror --force" "rm -i -f -r build"; do
+for c in "git push mirror --force" "rm -i -f -r build" "git --git-dir=/x reset --hard"; do
   [ "$(decision $c)" = "없음" ] && ok "$c" || no "$c 를 막았다. 한계 설명을 고친다"
 done
 
