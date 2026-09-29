@@ -211,6 +211,10 @@ def is_user_command(row):
     return row.get("type") == "user" and row_text(row).lstrip().startswith("<bash-input>")
 
 
+def is_notification(row):
+    return row.get("type") == "user" and row_text(row).lstrip().startswith("<task-notification>")
+
+
 def commands_in(rows):
     """Bash 도구와 Codex exec 로 돌린 명령을 모은다."""
     found = []
@@ -320,27 +324,31 @@ def main():
     if not rows:
         return
 
-    # 마지막 사람 발화 이후의 턴만 본다
-    start = 0
+    # 마지막 사람 발화 이후의 턴만 본다. 조건 3 의 테스트 실행은 작업 알림에서 끊지 않는다.
+    # 백그라운드 작업을 기다리는 동안에도 알림 앞에서 실패한 테스트가 마지막 테스트 실행이다
+    start = test_start = 0
     for i, r in enumerate(rows):
         if is_human_turn(r):
             start = i
-    turn = rows[start + 1:]
+            if not is_notification(r):
+                test_start = i
 
     ran_commands, last_text = [], ""
     commands, last_test_failed = {}, False
-    for r in turn:
+    for i in range(test_start + 1, len(rows)):
+        r, in_turn = rows[i], i > start
         p = codex_payload(r)
         if p is not None:
             t = p.get("type")
             if t == "custom_tool_call":
                 command = shell_command(p.get("input"))
-                ran_commands.append(command)
+                if in_turn:
+                    ran_commands.append(command)
                 commands[p.get("call_id")] = command
             elif t == "custom_tool_call_output":
                 if is_test_run(commands.get(p.get("call_id"), "")):
                     last_test_failed = run_failed(p.get("output"))
-            elif t == "message" and p.get("role") == "assistant":
+            elif t == "message" and p.get("role") == "assistant" and in_turn:
                 last_text = as_text(p.get("content"))
             continue
         kind = r.get("type")
@@ -349,11 +357,12 @@ def main():
             for b in content_blocks(r):
                 if b.get("type") == "tool_use" and b.get("name") == "Bash":
                     command = (b.get("input") or {}).get("command", "") or ""
-                    ran_commands.append(command)
+                    if in_turn:
+                        ran_commands.append(command)
                     commands[b.get("id")] = command
                 elif b.get("type") == "text":
                     texts.append(b.get("text", ""))
-            if texts:
+            if texts and in_turn:
                 last_text = "\n".join(texts)
         elif kind == "user":
             # 테스트 실행의 결과는 종료 코드가 아니라 출력으로 본다 — 파이프를 물리면 0 으로 끝난다
