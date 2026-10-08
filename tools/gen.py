@@ -4,6 +4,7 @@
 실행하면 같은 폴더에 미리보기 preview.html 을 쓴다. 문서에는 build_workflow.py 로 넣고 check.js 로 렌더를 측정한다.
 """
 import html
+import re
 from pathlib import Path
 
 OUT = Path(__file__).parent
@@ -285,7 +286,8 @@ G_CROSS = ("codex-cross-check", F, [
     ("역할", ("", [
         "Claude가 세션의 첫 호출 전에 Codex 모델과 추론 수준을 개발자에게 질문한다.",
         "Claude가 Codex의 남은 사용량을 확인하고 이전 맥락을 모르는 새 작업으로 요청한다.",
-        "Claude가 항목마다 주고받은 내용을 요약해 답변에서만 보고한다. PR 댓글로 게시하지 않는다."]))])
+        "Claude가 Codex 호출을 `crosscheck.py run` 으로 감싸 실행한다. `crosscheck.py` 가 호출마다 Codex 세션 ID·모델·추론 수준·사용량을 기록한다.",
+        "Claude가 항목마다 주고받은 내용의 요지를 `crosscheck.py note` 로 기록한다. `report` 출력으로 답변에서만 보고하고 PR 댓글로 게시하지 않는다."]))])
 G_RENDER = ("render-check.js", F, [
     ("적용 시점", "슬라이드처럼 크기가 정해진 문서를 렌더링해 확인할 때"),
     ("역할", "장마다 넘침·잘림·바닥 여백·겹침을 측정한다.")])
@@ -296,16 +298,18 @@ G_CKPT = ("commit-checkpoint.py", T, [
                  "다음 사이클 RED 대신 체크포인트 보고를 제시하라고 Claude에게 지시한다.")])
 G_ADD = ("git-guard.py", T, [
     ("적용 시점", "Claude가 셸 명령을 실행하기 전"),
-    ("차단 대상", "git add -A, git add --all, git add . 을 차단한다.")])
+    ("차단 대상", "git add -A, git add --all, git add . 을 차단한다. `git -C 경로 add -A` 처럼 전역 옵션을 준 git 명령도 차단한다.")])
 G_STOP = ("stop-check.py", T, [
     ("적용 시점", "Claude가 답변을 끝내기 전"),
-    ("차단 대상", ("답변의 추천 명령이 아래에 해당하면 답변을 반려한다.", [
+    ("차단 대상", ("Claude가 실행한 명령이나 답변 내용이 아래에 해당하면 답변을 반려한다. `git -C 경로` 처럼 전역 옵션을 준 git 명령도 같은 명령으로 판정한다.", [
         f"이번 턴에 {STATE_CMDS}을 하나도 실행하지 않고 스테이징·커밋·푸시·PR 명령을 제시했다.",
         "이번 턴의 마지막 테스트가 실패했는데 스테이징·커밋·푸시·PR 명령을 제시했다. 빈 커밋 명령은 제외한다.",
         "현재 대화에서 수정한 문서를 새 파일이나 추가·삭제 합 50줄 이상으로 커밋하는데 마지막 수정 뒤에 그 문서의 독자 테스트를 끝까지 실행하지 않았다.",
         "커밋 메시지에 「검토:」 줄이 있는데 같은 명령 블록에 PR 댓글 주소가 없다.",
         "PR 댓글을 게시하고 커밋 명령을 제시했는데 git push 블록이 없다.",
-        "개발자에게 cat·grep 같은 조회 명령으로 시작하는 블록을 제시했다."])),
+        "개발자에게 cat·grep 같은 조회 명령으로 시작하는 블록을 제시했다.",
+        "교차 검증의 Codex 작업을 `crosscheck.py run` 으로 감싸지 않고 호출했다. 독자 테스트는 제외한다.",
+        "`crosscheck.py note` 로 기록한 교차 검증 항목의 제목이 그 뒤 답변 어디에도 없다."])),
     ("검사 생략 조건", "개발자가 마지막 메시지나 그 뒤 질문 창 답에 「독자 테스트 생략」을 별도의 한 줄로 기록하면 독자 테스트 확인을 생략한다.")])
 G_FB = ("stop-check.py", T, [
     ("적용 시점", "Claude가 커밋 명령을 제시한 뒤 받은 요청에 답변을 끝내기 전"),
@@ -860,11 +864,12 @@ def legend_svg():
 
 
 def text_html(value):
-    """문장 하나 또는 (도입 문장, 항목 목록)."""
+    """문장 하나 또는 (도입 문장, 항목 목록). `…` 로 감싼 글자는 <code> 로 낸다."""
+    code = lambda t: re.sub(r"`([^`]+)`", r"<code>\1</code>", esc(t))
     if isinstance(value, str):
-        return esc(value)
+        return code(value)
     intro, items = value
-    return esc(intro) + ("<ul>" + "".join(f"<li>{esc(t)}</li>" for t in items) + "</ul>" if items else "")
+    return code(intro) + ("<ul>" + "".join(f"<li>{code(t)}</li>" for t in items) + "</ul>" if items else "")
 
 
 def notes_html(notes, n=None, seen=None):
