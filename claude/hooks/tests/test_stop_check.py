@@ -292,7 +292,7 @@ class ReaderTest(unittest.TestCase):
             self.assertIn("guide.html", result.stdout)
             self.assertNotIn("plan.html", result.stdout)
 
-    def test_독자_테스트_뒤에_문서를_다시_고치면_막는다(self):
+    def test_독자_테스트_뒤에_문서를_다시_고치면_실행_여부를_묻게_한다(self):
         with tempfile.TemporaryDirectory() as folder:
             repo, doc = staged_repo(folder, "docs/plan.html", 60)
             rows = [
@@ -307,7 +307,7 @@ class ReaderTest(unittest.TestCase):
             ]
             result = run(transcript(rows, folder))
             self.assertIn("block", result.stdout)
-            self.assertIn("독자 테스트", result.stdout)
+            self.assertIn("사용자에게 실행 여부를 묻는다", result.stdout)
 
     def test_사용자가_독자_테스트_생략이라고_쓰면_통과한다(self):
         with tempfile.TemporaryDirectory() as folder:

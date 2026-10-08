@@ -404,10 +404,11 @@ def main():
     unread = [p for b in commits for p in staged_documents(b)
               if p in edits and not any(t > edits[p] for t in tests.get(document_name(p), []))]
     if unread:
-        problems.append("독자 테스트를 돌리지 않은 문서를 커밋하려 한다: " +
+        problems.append("마지막으로 고친 뒤 독자 테스트를 돌리지 않은 문서를 커밋하려 한다: " +
                         ", ".join(os.path.basename(p) for p in unread) +
-                        ". doc-writing 「처음 읽는 독자로 확인한다」대로 사본 폴더 이름을 reader-test-{문서 이름} 으로 해 돌리고 "
-                        "결과를 보고한 뒤 커밋 명령을 낸다. 사용자가 한 줄에 「독자 테스트 생략」이라고 썼으면 통과한다")
+                        ". 커밋 명령을 내기 전에 질문 창으로 사용자에게 실행 여부를 묻는다. 묻지 않고 실행하지 않는다. "
+                        "선택지 이름은 「실행」과 「독자 테스트 생략」 그대로 쓰고 (Recommended) 같은 말을 붙이지 않는다. "
+                        "실행하면 doc-writing 「처음 읽는 독자로 확인한다」대로 사본 폴더 이름을 reader-test-{문서 이름} 으로 한다")
     if problems:
         print(json.dumps({"decision": "block",
                           "reason": "[stop-check] " + " / ".join(problems)}, ensure_ascii=False))
