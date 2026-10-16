@@ -138,6 +138,19 @@ class ProseCheck(unittest.TestCase):
             })
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_HyperFrames_프로젝트_안의_파일은_검사하지_않는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "videos" / "demo"
+            project.mkdir(parents=True)
+            (project / "hyperframes.json").write_text("{}", encoding="utf-8")
+            board = project / "STORYBOARD.md"
+            board.write_text("Scene 1 holds the title — the camera stays still.\n", encoding="utf-8")
+            result = run({
+                "hook_event_name": "PostToolUse", "tool_name": "Write", "cwd": folder,
+                "tool_input": {"file_path": str(board)},
+            })
+            self.assertEqual(0, result.returncode, result.stderr)
+
     def test_코드_블록_안의_한_줄만_고치면_산문으로_보지_않는다(self):
         import subprocess as sp
         with tempfile.TemporaryDirectory() as folder:
