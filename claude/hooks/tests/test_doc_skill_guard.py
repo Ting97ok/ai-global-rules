@@ -272,6 +272,21 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_Orca_재시작_안내는_새_요청으로_보지_않는다(self):
+        restart = user_text("Orca restarted. Resume the original unfinished user task with existing commitments and authorization.")
+        with tempfile.TemporaryDirectory() as folder:
+            doc = Path(folder) / "design" / "plan.html"
+            rows = [user_text("계획 문서 써 줘"), skill_call("doc-writing"), skill_call("grill-me"), restart]
+            result = run(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "transcript_path": transcript(rows, folder),
+                    "tool_input": {"file_path": str(doc)},
+                }
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+
     def test_앞선_요청의_심층_인터뷰_생략은_새_요청에_쓰지_않는다(self):
         with tempfile.TemporaryDirectory() as folder:
             doc = Path(folder) / "design" / "plan.html"
