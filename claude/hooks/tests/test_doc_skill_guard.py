@@ -451,6 +451,45 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(2, result.returncode, result.stderr)
 
+    def test_HyperFrames_프로젝트_안의_파일은_스킬_없이도_통과한다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "videos" / "demo"
+            (project / "compositions" / "frames").mkdir(parents=True)
+            (project / "hyperframes.json").write_text("{}", encoding="utf-8")
+            paths = [
+                project / "BRIEF.md",
+                project / "STORYBOARD.md",
+                project / "storyboard.html",
+                project / "compositions" / "frames" / "01-intro.html",
+            ]
+            for path in paths:
+                with self.subTest(path=str(path)):
+                    result = run(
+                        {
+                            "hook_event_name": "PreToolUse",
+                            "tool_name": "Write",
+                            "transcript_path": transcript([skill_call("humanize-korean")], folder),
+                            "tool_input": {"file_path": str(path)},
+                        }
+                    )
+                    self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_HyperFrames_프로젝트_옆의_문서는_그대로_막는다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            project = Path(folder) / "videos" / "demo"
+            project.mkdir(parents=True)
+            (project / "hyperframes.json").write_text("{}", encoding="utf-8")
+            doc = Path(folder) / "docs" / "video" / "prompt.md"
+            result = run(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "transcript_path": transcript([skill_call("humanize-korean")], folder),
+                    "tool_input": {"file_path": str(doc)},
+                }
+            )
+            self.assertEqual(2, result.returncode, result.stderr)
+
     def test_문서가_아닌_파일은_스킬_없이도_통과한다(self):
         with tempfile.TemporaryDirectory() as folder:
             code = Path(folder) / "src" / "app.py"

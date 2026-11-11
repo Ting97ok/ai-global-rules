@@ -121,7 +121,9 @@
     "claude-mem-cowork@thedotmack": true,
     "codex@openai-codex": true,
     "diagram-design@diagram-design": true,
-    "typesafe@typesafe-ai": true
+    "typesafe@typesafe-ai": true,
+    "hyperframes@hyperframes": true,
+    "fast-jev-compaction@fast-jev-compaction": true
   },
   "extraKnownMarketplaces": {
     "harness-marketplace": {
@@ -164,6 +166,18 @@
       "source": {
         "source": "github",
         "repo": "typesafe-ai/skills"
+      }
+    },
+    "hyperframes": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/heygen-com/hyperframes.git"
+      }
+    },
+    "fast-jev-compaction": {
+      "source": {
+        "source": "github",
+        "repo": "tamaratran/fast-jev-compaction"
       }
     }
   }

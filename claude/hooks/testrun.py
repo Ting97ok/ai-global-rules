@@ -157,6 +157,19 @@ TEMP_ROOTS = ("/tmp/", "/private/tmp/")
 CODE_DIRS = {"resources", "public", "static", "templates", "assets", "build", "out", "dist", "target", "node_modules"}
 APP_ROOT = re.compile(r"""<div\b[^>]*\bid\s*=\s*(['"])(?:root|app)\1""", re.I)
 MODULE_SCRIPT = re.compile(r"""<script\b(?=[^>]*\btype\s*=\s*(['"])module\1)[^>]*>""", re.I)
+HYPERFRAMES_MARK = "hyperframes.json"
+
+
+def in_hyperframes_project(path):
+    """위쪽 폴더 어딘가에 `hyperframes.json` 이 있으면 HyperFrames 프로젝트 안의 파일이다."""
+    folder = os.path.dirname(os.path.abspath(path))
+    while True:
+        if os.path.isfile(os.path.join(folder, HYPERFRAMES_MARK)):
+            return True
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            return False
+        folder = parent
 
 
 def is_document(path, text=None):
@@ -164,6 +177,7 @@ def is_document(path, text=None):
 
     `docs/` 같은 경로 규약은 프로젝트마다 달라서 확장자로 가른다.
     AI 설정·규칙 파일과 임시 폴더의 파일은 사람이 읽을 문서가 아니다.
+    HyperFrames 프로젝트 안의 md·html(`BRIEF.md`, `STORYBOARD.md`, 장면 html)은 영상 도구의 작업 파일이라 문서가 아니다.
     `.html` 은 화면 템플릿이나 앱 진입 파일일 수 있어 도구 규약 폴더 안이거나 앱을 띄우는 내용이면 뺀다.
     `.md` 에는 폴더 조건을 걸지 않는다. 리소스 폴더 안에 API 설계 문서를 두는 저장소가 있어서다.
     text 는 아직 없는 파일에 쓰려는 내용이다. 없으면 파일을 읽는다.
@@ -173,6 +187,8 @@ def is_document(path, text=None):
     p = path.replace("\\", "/")
     parts = p.split("/")
     if parts[-1] in AI_RULE_FILES or AI_CONFIG_DIRS & set(parts) or p.startswith(TEMP_ROOTS):
+        return False
+    if in_hyperframes_project(path):
         return False
     if not p.endswith(".html"):
         return True
