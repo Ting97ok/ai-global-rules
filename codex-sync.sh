@@ -72,13 +72,15 @@ done
 # 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
 [ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
 
+# Orca 앱이 Claude 쪽에 넣은 훅(~/.orca/agent-hooks 를 부른다)은 Claude 세션용이라 옮기지 않는다
 jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
   | .hooks as $h
   | ({PreToolUse: $h.PreToolUse, PostToolUse: $h.PostToolUse, Stop: $h.Stop} + $h)
   | with_entries(select(.value != null))
-  | map_values(map(.hooks |= map(select(.command as $c | all($not[]; . as $n | $c | contains($n) | not))))
+  | map_values(map(.hooks |= map(select(.command as $c | all($not[]; . as $n | $c | contains($n) | not)
+                                        and ($c | contains(".orca/agent-hooks") | not))))
                | map(select(.hooks | length > 0)))
   | with_entries(select(.value | length > 0))
   | walk(if type == "object" and has("command") then
