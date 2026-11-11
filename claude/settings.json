@@ -112,12 +112,12 @@
     ]
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": false,
     "figma@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "harness@harness-marketplace": true,
     "humanize-korean@im-not-ai": true,
-    "ponytail@ponytail": true,
+    "ponytail@ponytail": false,
     "claude-mem-cowork@thedotmack": true,
     "codex@openai-codex": true,
     "diagram-design@diagram-design": true,
