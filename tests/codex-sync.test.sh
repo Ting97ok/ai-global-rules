@@ -141,4 +141,16 @@ else
   no "Orca 훅이 있으면 끝나지 않는다"
 fi
 
+echo "Codex 쪽 Orca 훅은 지우지 않는다"
+jq '.hooks.Stop += [{"hooks": [{"type": "command", "command": ": orca-agent-hook-form=1; /bin/sh codex-hook.sh"}]}]
+    | .hooks.Interrupt = [{"hooks": [{"type": "command", "command": ": orca-agent-hook-form=1; /bin/sh codex-hook.sh"}]}]' \
+  "$T/codex/hooks.json" > "$T/h.json" && mv "$T/h.json" "$T/codex/hooks.json"
+CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
+  sh "$SCRIPT" -f > "$T/out7" 2>&1 || true
+J="$T/codex/hooks.json"
+[ "$(jq '[.hooks.Stop[]?.hooks[] | select(.command | contains("orca-agent-hook-form"))] | length' "$J" 2>/dev/null)" = 1 ] \
+  && ok "기존 이벤트의 Orca 훅이 그대로 있다" || no "기존 이벤트의 Orca 훅을 지웠다"
+jq -e '.hooks.Interrupt' "$J" > /dev/null 2>&1 && ok "Orca 훅만 있는 이벤트도 그대로 있다" || no "Orca 훅만 있는 이벤트를 지웠다"
+grep -q "git-guard.py" "$J" && ok "원본 훅도 그대로 옮긴다" || no "원본 훅이 빠졌다"
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
