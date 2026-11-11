@@ -89,6 +89,17 @@ jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
          else . end)
   | {hooks: .}' "$SRC/settings.json" > "$STAGE/codex/hooks.json"
 
+# Orca 앱이 Codex 쪽에 직접 넣은 훅(orca-agent-hook-form 표시가 있다)은 Orca 가 관리한다.
+# 새 hooks.json 으로 덮으면 Orca 와 Codex 세션의 연결이 끊겨서 지금 파일에서 가져와 붙인다
+if [ -f "$CODEX/hooks.json" ]; then
+  jq -s '(.[1].hooks // {} | map_values(map(.hooks |= map(select(.command | contains("orca-agent-hook-form"))))
+                                       | map(select(.hooks | length > 0)))
+                           | with_entries(select(.value | length > 0))) as $orca
+         | .[0] | .hooks = reduce ($orca | to_entries[]) as $e (.hooks; .[$e.key] = ((.[$e.key] // []) + $e.value))' \
+    "$STAGE/codex/hooks.json" "$CODEX/hooks.json" > "$T/hooks.json"
+  mv "$T/hooks.json" "$STAGE/codex/hooks.json"
+fi
+
 # 4. 새로 만든 것 / 지금 대상 / 지난 복사 기록을 비교한다
 sums() {  # sums <codex 뿌리>
   c=$1
