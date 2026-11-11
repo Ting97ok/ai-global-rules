@@ -505,6 +505,19 @@ class DocSkillGuard(unittest.TestCase):
             )
             self.assertEqual(2, result.returncode, result.stderr)
 
+    def test_Orca_채팅_시각화_폴더의_파일은_스킬_없이도_통과한다(self):
+        with tempfile.TemporaryDirectory() as folder:
+            page = Path(folder) / "Library" / "Application Support" / "orca" / "chat-scratch" / "5bbbf657" / "chart.html"
+            result = run(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "transcript_path": transcript([skill_call("humanize-korean")], folder),
+                    "tool_input": {"file_path": str(page)},
+                }
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+
     def test_문서가_아닌_파일은_스킬_없이도_통과한다(self):
         with tempfile.TemporaryDirectory() as folder:
             code = Path(folder) / "src" / "app.py"
