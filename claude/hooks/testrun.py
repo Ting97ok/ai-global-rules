@@ -227,12 +227,13 @@ def content_blocks(row):
 
 
 # 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
+# 「Orca restarted.」는 Orca 앱이 다시 켜진 뒤 끊긴 요청을 이어 가라고 보내는 안내다
 NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
-               "Stop hook feedback", "Base directory for this skill")
+               "Stop hook feedback", "Base directory for this skill", "Orca restarted.")
 
 
 def human_message(row):
-    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약은 뺀다.
+    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약·Orca 재시작 안내는 뺀다.
 
     이미지를 붙인 메시지는 글이 블록 목록으로 들어온다. 도구 결과가 든 줄(질문 창 답 포함)은 요청이 아니다.
     """
