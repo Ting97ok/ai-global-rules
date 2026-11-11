@@ -37,4 +37,18 @@ echo "파이썬 캐시 폴더는 복사하지 않는다"
 [ -e "$R/claude/hooks/__pycache__" ] && no "훅의 캐시 폴더를 복사했다" || ok "훅의 캐시 폴더는 복사하지 않는다"
 [ -e "$R/claude/skills/codex-cross-check/__pycache__" ] && no "스킬의 캐시 폴더를 복사했다" || ok "스킬의 캐시 폴더는 복사하지 않는다"
 
+echo "Orca 훅은 공개 설정에 옮기지 않는다"
+cat > "$C/settings.json" <<'EOF'
+{"permissions": {}, "enabledPlugins": {}, "extraKnownMarketplaces": {},
+ "hooks": {"Stop": [
+   {"hooks": [{"type": "command", "command": "python3 \"$HOME\"/.claude/hooks/stop-check.py"}]},
+   {"hooks": [{"type": "command", "command": "/bin/sh \"${HOME-}/.orca/agent-hooks/claude-hook.sh\""}]}],
+  "SessionStart": [{"hooks": [{"type": "command", "command": "/bin/sh \"${HOME-}/.orca/agent-hooks/claude-hook.sh\""}]}]}}
+EOF
+HOME="$T/home" sh "$R/sync.sh" > "$T/out2" 2>&1 || true
+S="$R/claude/settings.json"
+grep -q "orca/agent-hooks" "$S" && no "Orca 훅을 옮겼다" || ok "Orca 훅은 옮기지 않는다"
+grep -q "stop-check.py" "$S" && ok "다른 훅은 그대로 옮긴다" || no "다른 훅까지 뺐다"
+grep -q "SessionStart" "$S" && no "Orca 훅만 있던 이벤트가 남았다" || ok "Orca 훅만 있던 이벤트는 뺀다"
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
