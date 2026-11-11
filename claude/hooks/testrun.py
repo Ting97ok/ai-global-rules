@@ -153,6 +153,8 @@ def written_paths(command, cwd=""):
 AI_CONFIG_DIRS = {".claude", ".codex", ".agents", ".gemini", ".cursor"}
 AI_RULE_FILES = {"CLAUDE.md", "AGENTS.md", "GEMINI.md"}
 TEMP_ROOTS = ("/tmp/", "/private/tmp/")
+# Orca 채팅에 띄우는 시각화 페이지를 두는 폴더. 그 채팅에서만 쓰고, 남길 문서는 작업 폴더에 저장한다
+ORCA_CHAT_SCRATCH = "/orca/chat-scratch/"
 # 빌드 도구·프레임워크가 화면 템플릿·정적 파일·산출물을 두는 폴더 이름. 특정 프로젝트의 경로가 아니다
 CODE_DIRS = {"resources", "public", "static", "templates", "assets", "build", "out", "dist", "target", "node_modules"}
 APP_ROOT = re.compile(r"""<div\b[^>]*\bid\s*=\s*(['"])(?:root|app)\1""", re.I)
@@ -176,7 +178,7 @@ def is_document(path, text=None):
     """사람이 읽을 문서 파일인지 본다. doc-skill-guard 와 prose-check 가 함께 쓴다.
 
     `docs/` 같은 경로 규약은 프로젝트마다 달라서 확장자로 가른다.
-    AI 설정·규칙 파일과 임시 폴더의 파일은 사람이 읽을 문서가 아니다.
+    AI 설정·규칙 파일, 임시 폴더, Orca 채팅 시각화 폴더의 파일은 사람이 읽을 문서가 아니다.
     HyperFrames 프로젝트 안의 md·html(`BRIEF.md`, `STORYBOARD.md`, 장면 html)은 영상 도구의 작업 파일이라 문서가 아니다.
     `.html` 은 화면 템플릿이나 앱 진입 파일일 수 있어 도구 규약 폴더 안이거나 앱을 띄우는 내용이면 뺀다.
     `.md` 에는 폴더 조건을 걸지 않는다. 리소스 폴더 안에 API 설계 문서를 두는 저장소가 있어서다.
@@ -186,7 +188,7 @@ def is_document(path, text=None):
         return False
     p = path.replace("\\", "/")
     parts = p.split("/")
-    if parts[-1] in AI_RULE_FILES or AI_CONFIG_DIRS & set(parts) or p.startswith(TEMP_ROOTS):
+    if parts[-1] in AI_RULE_FILES or AI_CONFIG_DIRS & set(parts) or p.startswith(TEMP_ROOTS) or ORCA_CHAT_SCRATCH in p:
         return False
     if in_hyperframes_project(path):
         return False
@@ -227,12 +229,13 @@ def content_blocks(row):
 
 
 # 사용자 역할로 들어오지만 사용자가 쓴 요청이 아닌 것. 실제 기록에서 스킬 본문·훅 되먹임은 isMeta 로도 표시된다
+# 「Orca restarted.」는 Orca 앱이 다시 켜진 뒤 끊긴 요청을 이어 가라고 보내는 안내다
 NOT_REQUEST = ("<task-notification>", "<bash-input>", "<bash-stdout>", "<bash-stderr>", "<local-command-",
-               "Stop hook feedback", "Base directory for this skill")
+               "Stop hook feedback", "Base directory for this skill", "Orca restarted.")
 
 
 def human_message(row):
-    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약은 뺀다.
+    """Claude 기록에서 사용자가 직접 보낸 요청이면 그 글을 낸다. 작업 알림·스킬 본문·훅 되먹임·`!` 명령·컴팩트 요약·Orca 재시작 안내는 뺀다.
 
     이미지를 붙인 메시지는 글이 블록 목록으로 들어온다. 도구 결과가 든 줄(질문 창 답 포함)은 요청이 아니다.
     """

@@ -9,7 +9,13 @@ SKILLS="spring-conventions doc-writing codex-cross-check"
 mkdir -p claude/hooks claude/skills
 cp "$SRC/CLAUDE.md" claude/CLAUDE.md
 rsync -a --delete --exclude '__pycache__' "$SRC/hooks/" claude/hooks/
-jq '{permissions, hooks, enabledPlugins, extraKnownMarketplaces}' "$SRC/settings.json" > claude/settings.json
+# Orca 앱이 넣는 훅(~/.orca/agent-hooks 를 부른다)은 이 저장소의 규칙이 아니라 옮기지 않는다.
+# Orca 훅만 있던 이벤트도 빈 채로 남기지 않는다.
+jq '{permissions,
+     hooks: (.hooks | map_values(map(.hooks |= map(select(.command | contains(".orca/agent-hooks") | not)))
+                                 | map(select(.hooks | length > 0)))
+                    | with_entries(select(.value | length > 0))),
+     enabledPlugins, extraKnownMarketplaces}' "$SRC/settings.json" > claude/settings.json
 for s in $SKILLS; do
   rsync -a --delete --exclude '__pycache__' "$SRC/skills/$s/" "claude/skills/$s/"
 done

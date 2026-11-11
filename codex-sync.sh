@@ -72,13 +72,15 @@ done
 # 4. 권한 차단 규칙. settings.json 의 deny 에 해당하는 것을 손으로 옮겨 둔 파일이다
 [ -f "$RULES" ] && cp "$RULES" "$STAGE/codex/rules/"
 
+# Orca 앱이 Claude 쪽에 넣은 훅(~/.orca/agent-hooks 를 부른다)은 Claude 세션용이라 옮기지 않는다
 jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
   def pat: "^python3 \"\\$HOME\"/\\.claude/hooks/(?<f>[^/]+)$";
   ($not | split(" ") | map(select(length > 0))) as $not
   | .hooks as $h
   | ({PreToolUse: $h.PreToolUse, PostToolUse: $h.PostToolUse, Stop: $h.Stop} + $h)
   | with_entries(select(.value != null))
-  | map_values(map(.hooks |= map(select(.command as $c | all($not[]; . as $n | $c | contains($n) | not))))
+  | map_values(map(.hooks |= map(select(.command as $c | all($not[]; . as $n | $c | contains($n) | not)
+                                        and ($c | contains(".orca/agent-hooks") | not))))
                | map(select(.hooks | length > 0)))
   | with_entries(select(.value | length > 0))
   | walk(if type == "object" and has("command") then
@@ -86,6 +88,17 @@ jq --arg dir "$CODEX/hooks/" --arg q "'" --arg not "$NOT_HOOKS" '
            else error("codex-sync: 모르는 훅 명령 형식 \(.command)") end
          else . end)
   | {hooks: .}' "$SRC/settings.json" > "$STAGE/codex/hooks.json"
+
+# Orca 앱이 Codex 쪽에 직접 넣은 훅(orca-agent-hook-form 표시가 있다)은 Orca 가 관리한다.
+# 새 hooks.json 으로 덮으면 Orca 와 Codex 세션의 연결이 끊겨서 지금 파일에서 가져와 붙인다
+if [ -f "$CODEX/hooks.json" ]; then
+  jq -s '(.[1].hooks // {} | map_values(map(.hooks |= map(select(.command | contains("orca-agent-hook-form"))))
+                                       | map(select(.hooks | length > 0)))
+                           | with_entries(select(.value | length > 0))) as $orca
+         | .[0] | .hooks = reduce ($orca | to_entries[]) as $e (.hooks; .[$e.key] = ((.[$e.key] // []) + $e.value))' \
+    "$STAGE/codex/hooks.json" "$CODEX/hooks.json" > "$T/hooks.json"
+  mv "$T/hooks.json" "$STAGE/codex/hooks.json"
+fi
 
 # 4. 새로 만든 것 / 지금 대상 / 지난 복사 기록을 비교한다
 sums() {  # sums <codex 뿌리>
