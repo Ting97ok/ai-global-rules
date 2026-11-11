@@ -129,4 +129,16 @@ CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
   sh "$SCRIPT" -f > "$T/out5" 2>&1 || true
 grep -q 'developer_instructions' "$T/out5" && no "설정이 있는데도 알려 준다" || ok "설정이 있으면 잠잠하다"
 
+echo "Claude 쪽 Orca 훅은 옮기지 않고 끝까지 실행한다"
+jq '.hooks.Stop = [{"hooks": [{"type": "command", "command": "/bin/sh \"${HOME-}/.orca/agent-hooks/claude-hook.sh\""}]}]' \
+  "$T/claude/settings.json" > "$T/s.json" && mv "$T/s.json" "$T/claude/settings.json"
+if CLAUDE_CONFIG_DIR="$T/claude" CODEX_HOME="$T/codex" AGENTS_SKILLS="$T/skills" \
+   sh "$SCRIPT" -f > "$T/out6" 2>&1; then
+  ok "Orca 훅이 있어도 끝난다"
+  grep -q "orca/agent-hooks" "$T/codex/hooks.json" && no "Claude 쪽 Orca 훅을 옮겼다" || ok "Claude 쪽 Orca 훅은 옮기지 않는다"
+else
+  cat "$T/out6"
+  no "Orca 훅이 있으면 끝나지 않는다"
+fi
+
 if [ "$FAIL" = 0 ]; then echo "모두 통과"; else echo "실패 있음"; exit 1; fi
